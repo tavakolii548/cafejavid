@@ -24,7 +24,7 @@ android {
         targetSdk = 35
         versionCode = 1
         versionName = "1.0"
-        buildConfigField("String", "API_BASE", "\"http://10.0.2.2:3000/\"")
+        buildConfigField("String", "API_BASE", "\"http://2.188.205.66:3000/\"")
         buildConfigField("boolean", "DEMO_MODE", "false")
     }
 
