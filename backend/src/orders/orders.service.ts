@@ -79,7 +79,8 @@ export class OrdersService {
     }
 
     const created = await this.prisma.$transaction(async (tx) => {
-      await tx.$queryRaw`SELECT pg_advisory_xact_lock(1001)`;
+      // $executeRaw: pg_advisory_xact_lock returns void; $queryRaw fails to deserialize it (P2010 → 500).
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(1001)`;
       if (idempotencyKey) {
         const again = await tx.order.findUnique({ where: { idempotencyKey }, include: orderInclude });
         if (again) return again;
