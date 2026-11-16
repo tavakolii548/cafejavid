@@ -1,0 +1,70 @@
+@media print {
+  body * {
+    visibility: hidden !important;
+  }
+
+  .receipt-sheet,
+  .receipt-sheet * {
+    visibility: visible !important;
+  }
+
+  .receipt-sheet {
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: 80mm;
+    background: #fff;
+    color: #000;
+  }
+
+  @page {
+    size: 80mm auto;
+    margin: 4mm;
+  }
+}
+
+.receipt-sheet {
+  display: none;
+}
+
+@media print {
+  .receipt-sheet {
+    display: block;
+  }
+}
+
+.receipt {
+  width: 72mm;
+  color: #000;
+  background: #fff;
+  font-family: Vazirmatn, ui-monospace, monospace;
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.receipt h1 {
+  margin: 0;
+  font-size: 16px;
+  text-align: center;
+}
+
+.receipt .center {
+  text-align: center;
+}
+
+.receipt .row {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.receipt .opt {
+  padding-right: 12px;
+  color: #222;
+}
+
+.receipt hr {
+  border: none;
+  border-top: 1px dashed #000;
+  margin: 8px 0;
+}

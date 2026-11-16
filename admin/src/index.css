@@ -1,0 +1,35 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html,
+body,
+#root {
+  min-height: 100%;
+}
+
+:root {
+  --color-primary: #1e4d3a;
+  --color-accent: #f2b55a;
+  --color-sand: #fbebcf;
+  --color-tint: #e3ede6;
+  --color-danger: #b54a3a;
+  --color-danger-soft: #f6e4e1;
+  --timer-ok: var(--color-primary);
+  --timer-warn: var(--color-accent);
+  --timer-late: var(--color-danger);
+}
+
+body {
+  margin: 0;
+  background: #f4f6f2;
+  color: #17251e;
+  font-family: Vazirmatn, Tahoma, sans-serif;
+}
+
+button,
+input,
+select,
+textarea {
+  font-family: inherit;
+}

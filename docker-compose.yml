@@ -1,0 +1,42 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: cafe
+      POSTGRES_PASSWORD: cafe
+      POSTGRES_DB: cafejavid
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U cafe -d cafejavid"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  api:
+    build: ./backend
+    ports:
+      - "3000:3000"
+    environment:
+      DATABASE_URL: postgresql://cafe:cafe@postgres:5432/cafejavid?schema=public
+      JWT_SECRET: dev-change-me-please-use-a-long-secret
+      SMS_PROVIDER: console
+      SMS_API_KEY: ""
+      PAYMENT_ONLINE_ENABLED: "false"
+      CORS_ORIGINS: http://localhost:5173,http://127.0.0.1:5173
+      OWNER_USERNAME: owner
+      OWNER_PASSWORD: owner12345
+      UPLOAD_DIR: /app/uploads
+      PORT: "3000"
+      NODE_ENV: development
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - uploads:/app/uploads
+
+volumes:
+  pgdata:
+  uploads:

@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string-array name="steps_delivery">
+        <item>سفارش دریافت شد</item>
+        <item>در حال آماده‌سازی</item>
+        <item>آماده‌ی ارسال</item>
+        <item>پیک در راه است</item>
+        <item>تحویل داده شد</item>
+    </string-array>
+    <string-array name="steps_pickup">
+        <item>سفارش دریافت شد</item>
+        <item>در حال آماده‌سازی</item>
+        <item>آماده‌ی تحویل</item>
+        <item>تحویل داده شد</item>
+    </string-array>
+</resources>

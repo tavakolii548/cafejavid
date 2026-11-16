@@ -1,0 +1,2 @@
+# Prisma migrate lock — generated for PostgreSQL
+provider = "postgresql"
