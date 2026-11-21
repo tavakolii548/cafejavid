@@ -4,16 +4,27 @@ import { ApiException } from '../common/api.exception';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateDiscountCodeDto, UpdateDiscountCodeDto } from './dto';
 
-type CodeWithUser = DiscountCode & {
-  user: {
-    id: string;
-    phone: string;
-    name: string | null;
-    firstName: string | null;
-    lastName: string | null;
-    customerCode: string | null;
-  };
+type CodeUserBrief = {
+  id: string;
+  phone: string;
+  name: string | null;
+  firstName: string | null;
+  lastName: string | null;
+  customerCode: string | null;
 };
+
+type CodeWithUser = DiscountCode & {
+  user: CodeUserBrief | null;
+};
+
+const userSelect = {
+  id: true,
+  phone: true,
+  name: true,
+  firstName: true,
+  lastName: true,
+  customerCode: true,
+} as const;
 
 @Injectable()
 export class DiscountsService {
@@ -22,18 +33,7 @@ export class DiscountsService {
   list() {
     return this.prisma.discountCode
       .findMany({
-        include: {
-          user: {
-            select: {
-              id: true,
-              phone: true,
-              name: true,
-              firstName: true,
-              lastName: true,
-              customerCode: true,
-            },
-          },
-        },
+        include: { user: { select: userSelect } },
         orderBy: { createdAt: 'desc' },
       })
       .then((rows) => rows.map((row) => this.present(row)));
@@ -45,9 +45,12 @@ export class DiscountsService {
       throw new ApiException(HttpStatus.BAD_REQUEST, 'INVALID_CODE', 'کد تخفیف معتبر نیست');
     }
     this.assertValue(dto.type, dto.value, dto.maxDiscount);
-    const user = await this.prisma.user.findUnique({ where: { id: dto.userId } });
-    if (!user) {
-      throw new ApiException(HttpStatus.NOT_FOUND, 'USER_NOT_FOUND', 'عضو باشگاه پیدا نشد');
+    const userId = dto.userId?.trim() || null;
+    if (userId) {
+      const user = await this.prisma.user.findUnique({ where: { id: userId } });
+      if (!user) {
+        throw new ApiException(HttpStatus.NOT_FOUND, 'USER_NOT_FOUND', 'عضو باشگاه پیدا نشد');
+      }
     }
     const existing = await this.prisma.discountCode.findUnique({ where: { code } });
     if (existing) {
@@ -60,25 +63,14 @@ export class DiscountsService {
         value: dto.value,
         minOrder: dto.minOrder ?? null,
         maxDiscount: dto.type === DiscountType.PERCENT ? dto.maxDiscount ?? null : null,
-        userId: dto.userId,
+        userId,
         active: dto.active !== false,
         startsAt: dto.startsAt ? new Date(dto.startsAt) : null,
         endsAt: dto.endsAt ? new Date(dto.endsAt) : null,
         maxUses: dto.maxUses ?? 1,
         createdById: createdById ?? null,
       },
-      include: {
-        user: {
-          select: {
-            id: true,
-            phone: true,
-            name: true,
-            firstName: true,
-            lastName: true,
-            customerCode: true,
-          },
-        },
-      },
+      include: { user: { select: userSelect } },
     });
     return this.present(created);
   }
@@ -86,18 +78,7 @@ export class DiscountsService {
   async update(id: string, dto: UpdateDiscountCodeDto) {
     const current = await this.prisma.discountCode.findUnique({
       where: { id },
-      include: {
-        user: {
-          select: {
-            id: true,
-            phone: true,
-            name: true,
-            firstName: true,
-            lastName: true,
-            customerCode: true,
-          },
-        },
-      },
+      include: { user: { select: userSelect } },
     });
     if (!current) {
       throw new ApiException(HttpStatus.NOT_FOUND, 'NOT_FOUND', 'کد تخفیف پیدا نشد');
@@ -111,18 +92,7 @@ export class DiscountsService {
     const updated = await this.prisma.discountCode.update({
       where: { id },
       data,
-      include: {
-        user: {
-          select: {
-            id: true,
-            phone: true,
-            name: true,
-            firstName: true,
-            lastName: true,
-            customerCode: true,
-          },
-        },
-      },
+      include: { user: { select: userSelect } },
     });
     return this.present(updated);
   }
@@ -196,7 +166,7 @@ export class DiscountsService {
     if (!code.active) {
       throw new ApiException(HttpStatus.BAD_REQUEST, 'CODE_INACTIVE', 'این کد غیرفعال است');
     }
-    if (code.userId !== userId) {
+    if (code.userId && code.userId !== userId) {
       throw new ApiException(HttpStatus.FORBIDDEN, 'CODE_NOT_FOR_YOU', 'این کد برای شما نیست');
     }
     const now = new Date();
@@ -229,8 +199,9 @@ export class DiscountsService {
   }
 
   private present(row: CodeWithUser) {
-    const displayName =
-      [row.user.firstName, row.user.lastName].filter(Boolean).join(' ') || row.user.name || null;
+    const displayName = row.user
+      ? [row.user.firstName, row.user.lastName].filter(Boolean).join(' ') || row.user.name || null
+      : null;
     return {
       id: row.id,
       code: row.code,
@@ -246,14 +217,16 @@ export class DiscountsService {
       usedCount: row.usedCount,
       createdAt: row.createdAt.toISOString(),
       createdById: row.createdById,
-      user: {
-        id: row.user.id,
-        phone: row.user.phone,
-        name: displayName,
-        firstName: row.user.firstName,
-        lastName: row.user.lastName,
-        customerCode: row.user.customerCode,
-      },
+      user: row.user
+        ? {
+            id: row.user.id,
+            phone: row.user.phone,
+            name: displayName,
+            firstName: row.user.firstName,
+            lastName: row.user.lastName,
+            customerCode: row.user.customerCode,
+          }
+        : null,
     };
   }
 }

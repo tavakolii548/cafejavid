@@ -25,8 +25,10 @@ export class CreateDiscountCodeDto {
   @Min(1)
   value!: number;
 
+  /** Omit / null = usable by all customers */
+  @IsOptional()
   @IsString()
-  userId!: string;
+  userId?: string | null;
 
   @IsOptional()
   @Type(() => Number)

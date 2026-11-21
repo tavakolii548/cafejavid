@@ -44,24 +44,52 @@ export function LoginPage() {
   }
 
   return (
-    <main className="grid min-h-screen place-items-center bg-background p-6">
-      <form onSubmit={submit} className="w-full max-w-md rounded-card border border-line bg-white p-8">
-        <h1 className="mb-6 text-center text-[22px] font-bold">ورود کارکنان</h1>
+    <main className="relative grid min-h-screen place-items-center overflow-hidden p-6">
+      <div
+        className="pointer-events-none absolute inset-0"
+        style={{
+          background:
+            'radial-gradient(900px 480px at 85% 10%, rgba(242,181,90,0.28), transparent 55%), radial-gradient(700px 420px at 10% 80%, rgba(30,77,58,0.22), transparent 50%), linear-gradient(165deg, #f7f9f5, #e8efe9)',
+        }}
+        aria-hidden
+      />
+      <form
+        onSubmit={submit}
+        className="relative w-full max-w-md rounded-[24px] border border-white/80 bg-white/92 p-8 shadow-[0_24px_60px_rgba(23,37,30,0.12)] backdrop-blur"
+      >
+        <div className="mb-6 text-center">
+          <div className="mx-auto mb-3 grid h-12 w-12 place-items-center rounded-2xl bg-primary text-lg font-bold text-accent">ج</div>
+          <h1 className="text-[1.45rem] font-bold text-ink">کافه جاوید</h1>
+          <p className="mt-1 text-sm text-muted">ورود کارکنان</p>
+        </div>
         {PREVIEW_MODE ? (
-          <p className="mb-4 rounded-btn bg-sand px-3 py-2 text-sm text-muted">
+          <p className="mb-4 rounded-2xl border border-accent/30 bg-sand px-3 py-2 text-sm text-muted">
             حالت نمایشی فعال است؛ بدون سرور می‌توانی همه صفحات را ببینی.
           </p>
         ) : null}
         <label className="mb-2 block text-sm text-muted">نام کاربری</label>
-        <input className="mb-4 h-12 w-full rounded-btn border border-line px-3" value={username} onChange={(e) => setUsername(e.target.value)} />
+        <input
+          className="mb-4 h-12 w-full rounded-btn border border-line bg-white px-3 outline-none transition focus:border-primary"
+          value={username}
+          onChange={(e) => setUsername(e.target.value)}
+        />
         <label className="mb-2 block text-sm text-muted">رمز عبور</label>
-        <input className="mb-4 h-12 w-full rounded-btn border border-line px-3" type="password" value={password} onChange={(e) => setPassword(e.target.value)} />
-        {error ? <p className="mb-3 text-sm text-primary">{error}</p> : null}
-        <button className="h-14 w-full rounded-btn bg-primary text-base font-bold text-white" type="submit">
+        <input
+          className="mb-4 h-12 w-full rounded-btn border border-line bg-white px-3 outline-none transition focus:border-primary"
+          type="password"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+        />
+        {error ? <p className="mb-3 text-sm text-danger">{error}</p> : null}
+        <button className="h-14 w-full rounded-btn bg-primary text-base font-bold text-white transition hover:brightness-110" type="submit">
           ورود
         </button>
         {PREVIEW_MODE ? (
-          <button className="mt-3 h-12 w-full rounded-btn border border-line text-sm font-bold" type="button" onClick={enterPreview}>
+          <button
+            className="mt-3 h-12 w-full rounded-btn border border-line text-sm font-bold transition hover:bg-tint/50"
+            type="button"
+            onClick={enterPreview}
+          >
             ورود نمایشی به پنل
           </button>
         ) : null}

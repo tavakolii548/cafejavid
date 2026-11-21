@@ -2,8 +2,10 @@ import type { ReactNode } from 'react';
 import { Navigate, Route, Routes } from 'react-router-dom';
 import { Shell } from './components/Shell';
 import { loadSession } from './api';
+import { CustomerProfilePage } from './pages/CustomerProfilePage';
 import { CustomersPage } from './pages/CustomersPage';
 import { DiscountCodesPage } from './pages/DiscountCodesPage';
+import { InventoryPage } from './pages/InventoryPage';
 import { LoginPage } from './pages/LoginPage';
 import { MenuPage } from './pages/MenuPage';
 import { NotificationsPage } from './pages/NotificationsPage';
@@ -24,8 +26,10 @@ export function App() {
       <Route path="/login" element={<LoginPage />} />
       <Route path="/" element={<Private><OrdersPage /></Private>} />
       <Route path="/menu" element={<Private><MenuPage /></Private>} />
+      <Route path="/inventory" element={<Private owner><InventoryPage /></Private>} />
       <Route path="/reports" element={<Private owner><ReportsPage /></Private>} />
       <Route path="/customers" element={<Private owner><CustomersPage /></Private>} />
+      <Route path="/customers/:id" element={<Private owner><CustomerProfilePage /></Private>} />
       <Route path="/discount-codes" element={<Private owner><DiscountCodesPage /></Private>} />
       <Route path="/notifications" element={<Private owner><NotificationsPage /></Private>} />
       <Route path="/settings" element={<Private owner><SettingsPage /></Private>} />

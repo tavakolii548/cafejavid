@@ -22,3 +22,8 @@ android/app/release/
 *.jks
 *.keystore
 .cursor/
+
+*.apk
+*.rar
+CafeJavid.apk
+CafeJavid.rar

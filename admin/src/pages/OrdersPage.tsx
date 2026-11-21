@@ -40,18 +40,9 @@ const FULFILL: Record<string, string> = {
 };
 
 function beep() {
-  const AudioCtx = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
-  const ctx = new AudioCtx();
-  const osc = ctx.createOscillator();
-  const gain = ctx.createGain();
-  osc.frequency.value = 880;
-  osc.connect(gain);
-  gain.connect(ctx.destination);
-  gain.gain.setValueAtTime(0.08, ctx.currentTime);
-  gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.35);
-  osc.start();
-  osc.stop(ctx.currentTime + 0.35);
-  osc.onended = () => void ctx.close();
+  const audio = new Audio('/notif.mp3');
+  audio.volume = 1;
+  void audio.play().catch(() => undefined);
 }
 
 function summary(order: Order) {
@@ -221,97 +212,128 @@ export function OrdersPage() {
     void move(order, toStatus);
   }
 
+  const columnTone: Record<string, string> = {
+    NEW: 'bg-[linear-gradient(180deg,rgba(227,237,230,0.95),rgba(255,255,255,0.72))]',
+    PREPARING: 'bg-[linear-gradient(180deg,rgba(251,235,207,0.9),rgba(255,255,255,0.72))]',
+    READY: 'bg-[linear-gradient(180deg,rgba(242,181,90,0.22),rgba(255,255,255,0.75))]',
+  };
+
   return (
-    <div className="p-6">
-      {down ? <div className="mb-3 rounded-btn bg-sand px-4 py-2 text-sm">اتصال قطع شد</div> : null}
-      <header className="mb-5 flex flex-wrap items-start justify-between gap-4">
+    <div className="panel-page">
+      {down ? (
+        <div className="mb-4 rounded-2xl border border-accent/40 bg-sand px-4 py-2.5 text-sm shadow-sm">
+          اتصال لحظه‌ای قطع شد — در حال تلاش مجدد…
+        </div>
+      ) : null}
+
+      <header className="mb-6 flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h1 className="text-[22px] font-bold">{isToday ? 'سفارش‌های امروز' : 'سفارش‌ها'}</h1>
-          <p className="text-sm text-muted">
-            {toPersianDigits(orders.length)} سفارش ثبت شده · {toPersianDigits(active)} سفارش فعال
+          <p className="mb-1 text-xs font-medium text-primary/80">کافه جاوید</p>
+          <h1 className="panel-title">{isToday ? 'سفارش‌های امروز' : 'سفارش‌ها'}</h1>
+          <p className="panel-subtitle">
+            {toPersianDigits(orders.length)} سفارش ثبت‌شده · {toPersianDigits(active)} سفارش فعال
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <label className="flex flex-wrap items-center gap-2 rounded-full border border-line bg-white px-3 py-1 text-sm">
-            <span className="text-muted shrink-0">تاریخ شمسی</span>
-            <JalaliDateInput
-              compact
-              value={gregorianToJalaliInput(day)}
-              onChange={(jalali) => {
-                const ymd = jalaliInputToGregorianYmd(jalali);
-                if (ymd) setDay(ymd);
-              }}
-              yearFrom={tehranJalaliToday().jy - 3}
-              yearTo={tehranJalaliToday().jy + 1}
-            />
-          </label>
+          <JalaliDateInput
+            compact
+            value={gregorianToJalaliInput(day)}
+            onChange={(jalali) => {
+              const ymd = jalaliInputToGregorianYmd(jalali);
+              if (ymd) setDay(ymd);
+            }}
+            yearFrom={tehranJalaliToday().jy - 3}
+            yearTo={tehranJalaliToday().jy + 1}
+          />
           {!isToday ? (
-            <button className="h-10 rounded-full border border-line bg-white px-4 text-sm" onClick={() => setDay(tehranToday())}>
+            <button className="toolbar-chip" onClick={() => setDay(tehranToday())}>
               امروز
             </button>
           ) : null}
           <button
-            className="h-10 rounded-full border border-line bg-white px-4 text-sm"
+            className={`toolbar-chip ${printOn ? 'toolbar-chip-on' : ''}`}
             onClick={() => {
               const next = !printOn;
               setPrintOn(next);
               localStorage.setItem('cafe-print', next ? '1' : '0');
             }}
           >
-            چاپ خودکار فیش {printOn ? 'روشن است' : 'خاموش است'}
+            <span className={`h-2 w-2 rounded-full ${printOn ? 'bg-primary' : 'bg-line'}`} aria-hidden />
+            چاپ خودکار {printOn ? 'روشن' : 'خاموش'}
           </button>
           <button
-            className="h-10 rounded-full border border-line bg-white px-4 text-sm"
+            className={`toolbar-chip ${soundOn ? 'toolbar-chip-on' : ''}`}
             onClick={() => {
               const next = !soundOn;
               setSoundOn(next);
               localStorage.setItem('cafe-sound', next ? '1' : '0');
             }}
           >
-            صدای اعلان {soundOn ? 'روشن است' : 'خاموش است'}
+            <span className={`h-2 w-2 rounded-full ${soundOn ? 'bg-primary' : 'bg-line'}`} aria-hidden />
+            صدای اعلان {soundOn ? 'روشن' : 'خاموش'}
           </button>
         </div>
       </header>
+
       {ordersQuery.isError ? (
         <button className="mb-4 rounded-btn bg-primary px-4 py-2 text-white" onClick={() => ordersQuery.refetch()}>
           تلاش دوباره
         </button>
       ) : null}
+
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
         {columns.map((column) => (
-          <section key={column.key} className="rounded-card bg-tint/60 p-3">
-            <div className="mb-3 flex items-center justify-between">
-              <h2 className="font-bold">{column.title}</h2>
-              <span className={`grid h-7 min-w-7 place-items-center rounded-full px-2 text-sm font-bold ${column.key === 'NEW' ? 'bg-accent text-ink' : 'bg-white'}`}>
+          <section key={column.key} className={`board-column ${columnTone[column.key] ?? 'bg-white/70'}`}>
+            <div className="mb-3.5 flex items-center justify-between px-0.5">
+              <h2 className="text-[15px] font-bold">{column.title}</h2>
+              <span
+                className={`grid h-7 min-w-7 place-items-center rounded-full px-2 text-sm font-bold ${
+                  column.key === 'NEW' ? 'bg-accent text-ink' : 'bg-white/90 text-ink shadow-sm'
+                }`}
+              >
                 {toPersianDigits(column.items.length)}
               </span>
             </div>
             <div className="space-y-3">
-              {column.items.map((order) => (
-                <OrderCard
-                  key={order.id}
-                  order={order}
-                  flash={flash === order.id}
-                  open={openId === order.id}
-                  level={timerLevel(order, now)}
-                  onToggle={() => setOpenId(openId === order.id ? null : order.id)}
-                  onMove={(to) => requestMove(order, to)}
-                  onPrint={() => {
-                    setPrintOrder(order);
-                    window.setTimeout(() => window.print(), 50);
-                  }}
-                />
-              ))}
+              {column.items.length === 0 ? (
+                <div className="rounded-2xl border border-dashed border-line/80 bg-white/45 px-3 py-8 text-center text-sm text-muted">
+                  سفارشی نیست
+                </div>
+              ) : (
+                column.items.map((order) => (
+                  <OrderCard
+                    key={order.id}
+                    order={order}
+                    flash={flash === order.id}
+                    open={openId === order.id}
+                    level={timerLevel(order, now)}
+                    onToggle={() => setOpenId(openId === order.id ? null : order.id)}
+                    onMove={(to) => requestMove(order, to)}
+                    onPrint={() => {
+                      setPrintOrder(order);
+                      window.setTimeout(() => window.print(), 50);
+                    }}
+                  />
+                ))
+              )}
             </div>
           </section>
         ))}
       </div>
-      <section className="mt-6">
-        <button className="font-bold" onClick={() => setEnRouteOpen(!enRouteOpen)}>
-          در راه ({toPersianDigits(orders.filter((order) => order.status === 'OUT_FOR_DELIVERY').length)})
+
+      <section className="mt-7 rounded-[22px] border border-line/70 bg-white/70 p-4 shadow-[var(--shadow-soft)] backdrop-blur-sm">
+        <button
+          className="flex w-full items-center justify-between text-right font-bold"
+          onClick={() => setEnRouteOpen(!enRouteOpen)}
+        >
+          <span>در راه</span>
+          <span className="grid h-7 min-w-7 place-items-center rounded-full bg-tint px-2 text-sm">
+            {toPersianDigits(orders.filter((order) => order.status === 'OUT_FOR_DELIVERY').length)}
+          </span>
         </button>
-        {enRouteOpen
-          ? orders
+        {enRouteOpen ? (
+          <div className="mt-3 space-y-3">
+            {orders
               .filter((order) => order.status === 'OUT_FOR_DELIVERY')
               .map((order) => (
                 <OrderCard
@@ -327,25 +349,31 @@ export function OrdersPage() {
                     window.setTimeout(() => window.print(), 50);
                   }}
                 />
-              ))
-          : null}
+              ))}
+          </div>
+        ) : null}
       </section>
-      <section className="mt-6">
-        <h2 className="mb-2 font-bold">{isToday ? 'امروز تحویل شده' : 'تحویل شده'}</h2>
+
+      <section className="mt-5">
+        <h2 className="mb-3 text-[15px] font-bold">{isToday ? 'امروز تحویل شده' : 'تحویل شده'}</h2>
         <div className="space-y-2">
           {orders
             .filter((order) => order.status === 'DELIVERED')
             .map((order) => (
-              <div key={order.id} className="flex items-center justify-between rounded-card border border-line bg-white px-4 py-3 text-sm">
-                <span>سفارش {toPersianDigits(order.number)}</span>
-                <span>{formatPrice(order.total)}</span>
+              <div
+                key={order.id}
+                className="flex items-center justify-between rounded-2xl border border-line/80 bg-white/90 px-4 py-3 text-sm shadow-sm"
+              >
+                <span className="font-medium">سفارش {toPersianDigits(order.number)}</span>
+                <span className="font-bold text-primary">{formatPrice(order.total)}</span>
               </div>
             ))}
         </div>
       </section>
+
       {etaOrder ? (
-        <div className="fixed inset-0 z-40 grid place-items-center bg-ink/40 p-4" role="dialog" aria-modal="true">
-          <div className="w-full max-w-sm rounded-card bg-white p-5 shadow-lg">
+        <div className="fixed inset-0 z-40 grid place-items-center bg-ink/45 p-4 backdrop-blur-[2px]" role="dialog" aria-modal="true">
+          <div className="w-full max-w-sm rounded-[22px] border border-line bg-white p-5 shadow-[0_24px_60px_rgba(23,37,30,0.22)]">
             <h3 className="mb-1 text-lg font-bold">زمان آماده‌سازی</h3>
             <p className="mb-4 text-sm text-muted">
               سفارش {toPersianDigits(etaOrder.number)} — چند دقیقه تا آماده شدن؟
@@ -354,7 +382,7 @@ export function OrdersPage() {
               {ETA_OPTIONS.map((mins) => (
                 <button
                   key={mins}
-                  className="h-12 rounded-btn bg-primary text-sm font-bold text-white"
+                  className="h-12 rounded-btn bg-primary text-sm font-bold text-white transition hover:brightness-110"
                   onClick={() => {
                     const order = etaOrder;
                     setEtaOrder(null);
@@ -401,24 +429,24 @@ function OrderCard({
   const style = timerStyle(level);
   return (
     <article
-      className={`rounded-card border bg-white p-3 ${flash ? 'border-accent' : 'border-line'}`}
+      className={`order-card ${flash ? 'order-card-flash border-accent' : ''}`}
       style={style}
     >
-      <div className="mb-2 flex items-center justify-between">
-        <strong>سفارش {toPersianDigits(order.number)}</strong>
-        <span className="text-sm text-muted">{tehranTime(order.createdAt)}</span>
+      <div className="mb-2.5 flex items-start justify-between gap-2">
+        <strong className="text-[15px]">سفارش {toPersianDigits(order.number)}</strong>
+        <span className="rounded-full bg-tint/80 px-2 py-0.5 text-xs text-muted">{tehranTime(order.createdAt)}</span>
       </div>
-      <div className="mb-2 inline-block rounded-full bg-sand px-2 py-1 text-xs">{badge}</div>
+      <div className="mb-2 inline-flex rounded-full bg-sand px-2.5 py-1 text-[11px] font-medium text-ink/85">{badge}</div>
       {order.customerNote ? (
-        <p className="mb-2 rounded-btn bg-sand/80 px-2 py-1.5 text-sm font-semibold text-ink">
+        <p className="mb-2 rounded-xl border border-accent/25 bg-sand/90 px-2.5 py-1.5 text-sm font-semibold text-ink">
           توضیح مشتری: {order.customerNote}
         </p>
       ) : null}
-      <button className="block w-full text-right text-sm" onClick={onToggle}>
+      <button className="block w-full rounded-xl px-1 py-1 text-right text-sm leading-6 transition hover:bg-tint/40" onClick={onToggle}>
         {summary(order)}
       </button>
       {open ? (
-        <ul className="mt-2 space-y-1 text-xs text-muted">
+        <ul className="mt-2 space-y-1 rounded-xl bg-tint/35 px-2.5 py-2 text-xs text-muted">
           {order.items.map((item) => (
             <li key={item.id}>
               {item.productName}
@@ -429,21 +457,28 @@ function OrderCard({
           ))}
         </ul>
       ) : null}
-      <div className="mt-3 flex items-center justify-between gap-2">
-        <span className="text-sm font-bold">{formatPrice(order.total)}</span>
+      <div className="mt-3.5 flex items-center justify-between gap-2 border-t border-line/70 pt-3">
+        <span className="text-sm font-bold text-primary">{formatPrice(order.total)}</span>
         <div className="flex items-center gap-2">
-          <button className="grid h-11 w-11 place-items-center rounded-[14px] border border-line" onClick={onPrint} aria-label="چاپ فیش">
+          <button
+            className="grid h-11 min-w-11 place-items-center rounded-[14px] border border-line bg-white px-2 text-xs font-medium transition hover:bg-tint/50"
+            onClick={onPrint}
+            aria-label="چاپ فیش"
+          >
             چاپ
           </button>
           {action ? (
-            <button className="h-11 rounded-btn bg-ink px-3 text-sm font-bold text-white" onClick={() => onMove(action.to)}>
+            <button
+              className="h-11 rounded-btn bg-primary px-3.5 text-sm font-bold text-white transition hover:brightness-110"
+              onClick={() => onMove(action.to)}
+            >
               {action.label}
             </button>
           ) : null}
         </div>
       </div>
       {order.status !== 'DELIVERED' && order.status !== 'CANCELLED' ? (
-        <button className="mt-2 text-xs text-muted" onClick={() => onMove('CANCELLED')}>
+        <button className="mt-2 text-xs text-muted transition hover:text-danger" onClick={() => onMove('CANCELLED')}>
           لغو سفارش
         </button>
       ) : null}

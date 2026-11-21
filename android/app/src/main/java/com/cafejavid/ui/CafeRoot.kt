@@ -1,7 +1,7 @@
 package com.cafejavid.ui
 
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.padding
-import androidx.compose.ui.unit.dp
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material.icons.outlined.ReceiptLong
@@ -12,13 +12,15 @@ import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.ViewModel
 import androidx.navigation.NavGraph.Companion.findStartDestination
@@ -40,7 +42,9 @@ import com.cafejavid.ui.orders.OrdersScreen
 import com.cafejavid.ui.orders.ProfileScreen
 import com.cafejavid.ui.orders.TrackingScreen
 import com.cafejavid.ui.theme.Background
+import com.cafejavid.ui.theme.Border
 import com.cafejavid.ui.theme.PrimaryGreen
+import com.cafejavid.ui.theme.PrimaryTint
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 
@@ -59,7 +63,7 @@ object Routes {
 class RootViewModel @Inject constructor(val sessionStore: SessionStore) : ViewModel()
 
 @Composable
-fun CafeRoot(vm: RootViewModel = hiltViewModel()) {
+fun CafeRoot(openNotifications: Boolean = false, vm: RootViewModel = hiltViewModel()) {
     val session by produceState<Session?>(initialValue = null, vm) {
         vm.sessionStore.session.collect { value = it }
     }
@@ -71,6 +75,11 @@ fun CafeRoot(vm: RootViewModel = hiltViewModel()) {
     val start = remember {
         if (!session!!.accessToken.isNullOrBlank()) Routes.Menu else Routes.Login
     }
+    LaunchedEffect(openNotifications, session?.accessToken) {
+        if (openNotifications && !session?.accessToken.isNullOrBlank()) {
+            nav.navigate(Routes.Notifications)
+        }
+    }
     val backStack by nav.currentBackStackEntryAsState()
     val route = backStack?.destination?.route
     val tabs = route == Routes.Menu || route == Routes.Orders || route == Routes.Profile
@@ -78,7 +87,11 @@ fun CafeRoot(vm: RootViewModel = hiltViewModel()) {
         containerColor = Background,
         bottomBar = {
             if (tabs) {
-                NavigationBar(containerColor = androidx.compose.ui.graphics.Color.White) {
+                NavigationBar(
+                    containerColor = Color.White,
+                    tonalElevation = 0.dp,
+                    modifier = Modifier.border(width = 1.dp, color = Border),
+                ) {
                     Tab(nav, Routes.Menu, stringResource(R.string.tab_menu), Icons.Outlined.Restaurant, route)
                     Tab(nav, Routes.Orders, stringResource(R.string.tab_orders), Icons.Outlined.ReceiptLong, route)
                     Tab(nav, Routes.Profile, stringResource(R.string.tab_profile), Icons.Outlined.Person, route)
@@ -159,7 +172,9 @@ private fun androidx.compose.foundation.layout.RowScope.Tab(
         colors = androidx.compose.material3.NavigationBarItemDefaults.colors(
             selectedIconColor = PrimaryGreen,
             selectedTextColor = PrimaryGreen,
-            indicatorColor = com.cafejavid.ui.theme.PrimaryTint,
+            indicatorColor = PrimaryTint,
+            unselectedIconColor = com.cafejavid.ui.theme.Muted,
+            unselectedTextColor = com.cafejavid.ui.theme.Muted,
         ),
     )
 }

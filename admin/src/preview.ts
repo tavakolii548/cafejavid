@@ -27,7 +27,14 @@ function p(
   description: string,
   price: number,
   sortOrder: number,
-  extras?: { imageFile?: string; featured?: boolean; soldOut?: boolean; hidden?: boolean },
+  extras?: {
+    imageFile?: string;
+    featured?: boolean;
+    soldOut?: boolean;
+    hidden?: boolean;
+    serviceStartHour?: number | null;
+    serviceEndHour?: number | null;
+  },
 ): Product {
   return {
     id,
@@ -40,6 +47,8 @@ function p(
     soldOut: extras?.soldOut ?? false,
     hidden: extras?.hidden ?? false,
     sortOrder,
+    serviceStartHour: extras?.serviceStartHour ?? null,
+    serviceEndHour: extras?.serviceEndHour ?? null,
     optionGroups: [],
   };
 }
@@ -269,12 +278,16 @@ type PreviewCampaign = {
   body: string;
   audience: 'ALL' | 'USER' | 'MULTI' | 'BIRTHDAY' | 'SPECIAL_DAY';
   delivery: 'NOW' | 'RULE';
+  ruleKind: 'CALENDAR' | 'INTERVAL';
+  intervalUnit: 'HOURS' | 'DAYS' | 'WEEKS' | null;
+  intervalValue: number | null;
   userId: string | null;
   userIds: string[];
   specialMonth: number | null;
   specialDay: number | null;
   active: boolean;
   lastRunOn: string | null;
+  lastRunAt: string | null;
   createdAt: string;
   recipientCount: number;
 };
@@ -286,7 +299,7 @@ type PreviewDiscountCode = {
   value: number;
   minOrder: number | null;
   maxDiscount: number | null;
-  userId: string;
+  userId: string | null;
   active: boolean;
   startsAt: string | null;
   endsAt: string | null;
@@ -301,7 +314,7 @@ type PreviewDiscountCode = {
     firstName: string | null;
     lastName: string | null;
     customerCode: string | null;
-  };
+  } | null;
 };
 
 function clubUserBrief(c: PreviewCustomer) {
@@ -410,12 +423,16 @@ export const previewNotifications: PreviewCampaign[] = [
     body: 'شوکو پینات با ۲۰٪ تخفیف تا ساعت ۲۲',
     audience: 'ALL',
     delivery: 'NOW',
+    ruleKind: 'CALENDAR',
+    intervalUnit: null,
+    intervalValue: null,
     userId: null,
     userIds: [],
     specialMonth: null,
     specialDay: null,
     active: false,
     lastRunOn: null,
+    lastRunAt: now,
     createdAt: now,
     recipientCount: 3,
   },
@@ -425,12 +442,16 @@ export const previewNotifications: PreviewCampaign[] = [
     body: '%name عزیز، تولدت مبارک! یک نوشیدنی مهمان کافه جاوید.',
     audience: 'BIRTHDAY',
     delivery: 'RULE',
+    ruleKind: 'CALENDAR',
+    intervalUnit: null,
+    intervalValue: null,
     userId: null,
     userIds: [],
     specialMonth: null,
     specialDay: null,
     active: true,
     lastRunOn: birthdayToday,
+    lastRunAt: now,
     createdAt: now,
     recipientCount: 1,
   },
@@ -440,14 +461,37 @@ export const previewNotifications: PreviewCampaign[] = [
     body: 'به مناسبت روز زن، ۱۰٪ تخفیف روی کیک‌ها',
     audience: 'SPECIAL_DAY',
     delivery: 'RULE',
+    ruleKind: 'CALENDAR',
+    intervalUnit: null,
+    intervalValue: null,
     userId: null,
     userIds: [],
     specialMonth: 12,
     specialDay: 17,
     active: false,
     lastRunOn: null,
+    lastRunAt: null,
     createdAt: now,
     recipientCount: 0,
+  },
+  {
+    id: 'n-weekly',
+    title: 'پیشنهاد هفتگی',
+    body: 'این هفته یک قهوه مهمان ما باش!',
+    audience: 'ALL',
+    delivery: 'RULE',
+    ruleKind: 'INTERVAL',
+    intervalUnit: 'WEEKS',
+    intervalValue: 1,
+    userId: null,
+    userIds: [],
+    specialMonth: null,
+    specialDay: null,
+    active: true,
+    lastRunOn: null,
+    lastRunAt: now,
+    createdAt: now,
+    recipientCount: 4,
   },
 ];
 
@@ -467,6 +511,88 @@ export const previewReport = {
     count: [0, 0, 0, 0, 0, 0, 0, 1, 2, 3, 4, 5, 6, 4, 3, 5, 7, 8, 6, 4, 2, 1, 0, 0][hour],
   })),
 };
+
+type PreviewInventoryItem = {
+  id: string;
+  name: string;
+  unit: string;
+  unitLabel: string;
+  quantityOnHand: number;
+  lowStockAt: number | null;
+  active: boolean;
+  lowStock: boolean;
+  createdAt: string;
+  updatedAt: string;
+};
+
+function presentPreviewItem(row: Omit<PreviewInventoryItem, 'unitLabel' | 'lowStock' | 'createdAt' | 'updatedAt'> & {
+  createdAt?: string;
+  updatedAt?: string;
+}): PreviewInventoryItem {
+  const unit = (row.unit || 'عدد').trim() || 'عدد';
+  const low =
+    typeof row.lowStockAt === 'number' ? row.quantityOnHand <= row.lowStockAt : row.quantityOnHand <= 0;
+  return {
+    ...row,
+    unit,
+    unitLabel: unit,
+    lowStock: low,
+    createdAt: row.createdAt || now,
+    updatedAt: row.updatedAt || now,
+  };
+}
+
+export const previewInventoryItems: PreviewInventoryItem[] = [
+  presentPreviewItem({ id: 'inv-milk', name: 'شیر', unit: 'میلی‌لیتر', quantityOnHand: 12000, lowStockAt: 2000, active: true }),
+  presentPreviewItem({ id: 'inv-espresso', name: 'پودر اسپرسو', unit: 'گرم', quantityOnHand: 3500, lowStockAt: 500, active: true }),
+  presentPreviewItem({ id: 'inv-cup', name: 'لیوان یک‌بارمصرف', unit: 'عدد', quantityOnHand: 180, lowStockAt: 40, active: true }),
+  presentPreviewItem({ id: 'inv-chocolate', name: 'سس شکلات', unit: 'میلی‌لیتر', quantityOnHand: 900, lowStockAt: 300, active: true }),
+];
+
+/** productId -> recipe lines */
+export const previewRecipes = new Map<string, { inventoryItemId: string; qtyPerUnit: number }[]>([
+  [
+    'p-1000004',
+    [
+      { inventoryItemId: 'inv-espresso', qtyPerUnit: 18 },
+      { inventoryItemId: 'inv-milk', qtyPerUnit: 200 },
+      { inventoryItemId: 'inv-cup', qtyPerUnit: 1 },
+    ],
+  ],
+  [
+    'p-1000005',
+    [
+      { inventoryItemId: 'inv-espresso', qtyPerUnit: 18 },
+      { inventoryItemId: 'inv-milk', qtyPerUnit: 180 },
+      { inventoryItemId: 'inv-chocolate', qtyPerUnit: 30 },
+      { inventoryItemId: 'inv-cup', qtyPerUnit: 1 },
+    ],
+  ],
+]);
+
+function buildPreviewRecipes() {
+  return previewProducts.map((product) => {
+    const lines = previewRecipes.get(product.id) || [];
+    const category = previewCategories.find((c) => c.id === product.categoryId);
+    return {
+      productId: product.id,
+      productName: product.name,
+      categoryId: product.categoryId,
+      categoryName: category?.name || '',
+      lines: lines.map((line, index) => {
+        const item = previewInventoryItems.find((row) => row.id === line.inventoryItemId);
+        return {
+          id: `${product.id}-${line.inventoryItemId}-${index}`,
+          inventoryItemId: line.inventoryItemId,
+          inventoryItemName: item?.name || 'ماده',
+          unit: item?.unit || 'گرم',
+          unitLabel: item?.unitLabel || item?.unit || 'گرم',
+          qtyPerUnit: line.qtyPerUnit,
+        };
+      }),
+    };
+  });
+}
 
 export function previewResponse(path: string, init?: RequestInit): unknown | null {
   const method = (init?.method || 'GET').toUpperCase();
@@ -496,10 +622,129 @@ export function previewResponse(path: string, init?: RequestInit): unknown | nul
     return next;
   }
   if (path.includes('/admin/orders') && method === 'GET') return previewOrders.map((order) => ({ ...order, items: order.items.map((item) => ({ ...item })) }));
-  if (path.includes('/admin/categories')) return previewCategories;
+  if (path.includes('/admin/categories')) {
+    if (method === 'GET') return [...previewCategories].sort((a, b) => a.sortOrder - b.sortOrder);
+    if (method === 'POST') {
+      const body = init?.body ? (JSON.parse(String(init.body)) as Partial<Category>) : {};
+      const created: Category = {
+        id: `cat-${Date.now()}`,
+        name: (body.name || 'دسته جدید').trim(),
+        sortOrder: body.sortOrder ?? previewCategories.length,
+        active: body.active ?? true,
+      };
+      previewCategories.push(created);
+      return created;
+    }
+    if (method === 'PUT' && path.includes('/categories/reorder')) {
+      const body = init?.body ? (JSON.parse(String(init.body)) as { ids?: string[] }) : {};
+      const ids = body.ids ?? [];
+      ids.forEach((id, index) => {
+        const cat = previewCategories.find((c) => c.id === id);
+        if (cat) cat.sortOrder = index;
+      });
+      previewCategories.sort((a, b) => a.sortOrder - b.sortOrder);
+      return [...previewCategories];
+    }
+    if (method === 'PUT') {
+      const id = path.split('/admin/categories/')[1]?.split(/[/?]/)[0] || '';
+      const body = init?.body ? (JSON.parse(String(init.body)) as Partial<Category>) : {};
+      const idx = previewCategories.findIndex((c) => c.id === id);
+      if (idx < 0) return { ok: false };
+      previewCategories[idx] = {
+        ...previewCategories[idx],
+        name: body.name?.trim() || previewCategories[idx].name,
+        sortOrder: body.sortOrder ?? previewCategories[idx].sortOrder,
+        active: body.active ?? previewCategories[idx].active,
+      };
+      return previewCategories[idx];
+    }
+    if (method === 'DELETE') {
+      const id = path.split('/admin/categories/')[1]?.split(/[/?]/)[0] || '';
+      const inUse = previewProducts.some((p) => p.categoryId === id);
+      if (inUse) throw new Error('این دسته محصول دارد');
+      const idx = previewCategories.findIndex((c) => c.id === id);
+      if (idx >= 0) previewCategories.splice(idx, 1);
+      return { ok: true };
+    }
+  }
   if (path.includes('/admin/products')) return previewProducts;
+  if (path.includes('/admin/customers/') && path.includes('/summary') && method === 'GET') {
+    const id = path.split('/admin/customers/')[1]?.split('/')[0] || '';
+    const member = previewCustomers.find((c) => c.id === id);
+    if (!member) throw new Error('مشتری پیدا نشد');
+    const userOrders = previewOrders.filter((o) => o.user?.id === id && o.status !== 'CANCELLED');
+    const totalSales = userOrders.reduce((sum, o) => sum + o.total, 0);
+    const productMap = new Map<string, { name: string; quantity: number; amount: number }>();
+    const hourly = Array.from({ length: 24 }, (_, hour) => ({ hour, count: 0 }));
+    const fulfillment: Record<string, number> = { DELIVERY: 0, PICKUP: 0, DINE_IN: 0 };
+    let discountTotal = 0;
+    for (const order of userOrders) {
+      const hour = new Date(order.createdAt).getHours();
+      hourly[hour].count += 1;
+      fulfillment[order.fulfillment] = (fulfillment[order.fulfillment] ?? 0) + 1;
+      discountTotal += order.discountAmount ?? 0;
+      for (const item of order.items) {
+        const row = productMap.get(item.productName) ?? { name: item.productName, quantity: 0, amount: 0 };
+        row.quantity += item.quantity;
+        row.amount += item.lineTotal;
+        productMap.set(item.productName, row);
+      }
+    }
+    // Demo bars if this user has few orders
+    if (userOrders.length <= 2) {
+      for (let h = 9; h <= 21; h += 1) hourly[h].count = Math.max(hourly[h].count, (h % 5) + 1);
+    }
+    return {
+      totalSales: totalSales || member.totalSpent,
+      orderCount: userOrders.length || member.orderCount,
+      averageOrderValue:
+        userOrders.length || member.orderCount
+          ? Math.round((totalSales || member.totalSpent) / (userOrders.length || member.orderCount))
+          : 0,
+      topProducts: [...productMap.values()].sort((a, b) => b.quantity - a.quantity).slice(0, 5),
+      hourly,
+      fulfillment,
+      discountTotal,
+    };
+  }
+  if (path.includes('/admin/customers/') && path.includes('/orders') && method === 'GET') {
+    const id = path.split('/admin/customers/')[1]?.split('/')[0] || '';
+    const rows = previewOrders
+      .filter((o) => o.user?.id === id)
+      .map((order) => ({
+        id: order.id,
+        number: order.number,
+        status: order.status,
+        fulfillment: order.fulfillment,
+        total: order.total,
+        discountAmount: order.discountAmount ?? 0,
+        discountCode: order.discountCode ?? null,
+        createdAt: order.createdAt,
+        itemCount: order.items.reduce((sum, item) => sum + item.quantity, 0),
+      }));
+    if (rows.length === 0) {
+      const member = previewCustomers.find((c) => c.id === id);
+      if (!member) throw new Error('مشتری پیدا نشد');
+      return [];
+    }
+    return rows;
+  }
   if (path.includes('/admin/customers')) {
-    if (method === 'GET') return previewCustomers;
+    if (method === 'GET') {
+      const idMatch = path.match(/\/admin\/customers\/([^/?]+)/);
+      if (idMatch?.[1] && idMatch[1] !== 'customers') {
+        const id = idMatch[1];
+        const member = previewCustomers.find((c) => c.id === id);
+        if (!member) throw new Error('مشتری پیدا نشد');
+        return {
+          ...member,
+          createdAt: minsAgo(60 * 24 * 40),
+          addressCount: id === 'u1' ? 2 : 1,
+          averageOrderValue: member.orderCount ? Math.round(member.totalSpent / member.orderCount) : 0,
+        };
+      }
+      return previewCustomers;
+    }
     if (method === 'POST') {
       const body = init?.body ? (JSON.parse(String(init.body)) as Record<string, string>) : {};
       const firstName = body.firstName?.trim() || '';
@@ -521,22 +766,34 @@ export function previewResponse(path: string, init?: RequestInit): unknown | nul
     }
     if (method === 'PATCH') {
       const id = path.split('/').pop() || '';
-      const body = init?.body ? (JSON.parse(String(init.body)) as Record<string, string>) : {};
+      const body = init?.body ? (JSON.parse(String(init.body)) as Record<string, string | null>) : {};
       const idx = previewCustomers.findIndex((c) => c.id === id);
       if (idx >= 0) {
         const prev = previewCustomers[idx];
-        const firstName = body.firstName !== undefined ? body.firstName.trim() : prev.firstName || '';
-        const lastName = body.lastName !== undefined ? body.lastName.trim() : prev.lastName || '';
+        const firstName = body.firstName !== undefined ? String(body.firstName || '').trim() : prev.firstName || '';
+        const lastName = body.lastName !== undefined ? String(body.lastName || '').trim() : prev.lastName || '';
         previewCustomers[idx] = {
           ...prev,
-          phone: body.phone?.trim() || prev.phone,
+          phone: (body.phone ? String(body.phone).trim() : prev.phone) || prev.phone,
           firstName: firstName || null,
           lastName: lastName || null,
           name: [firstName, lastName].filter(Boolean).join(' ') || null,
-          birthDate: body.birthDate !== undefined ? body.birthDate.trim() || null : prev.birthDate,
+          birthDate:
+            body.birthDate !== undefined
+              ? body.birthDate
+                ? String(body.birthDate).trim() || null
+                : null
+              : prev.birthDate,
           customerCode: prev.customerCode,
         };
-        return previewCustomers[idx];
+        return {
+          ...previewCustomers[idx],
+          createdAt: minsAgo(60 * 24 * 40),
+          addressCount: 1,
+          averageOrderValue: previewCustomers[idx].orderCount
+            ? Math.round(previewCustomers[idx].totalSpent / previewCustomers[idx].orderCount)
+            : 0,
+        };
       }
       return { ok: true };
     }
@@ -587,6 +844,9 @@ export function previewResponse(path: string, init?: RequestInit): unknown | nul
           body?: string;
           audience?: string;
           delivery?: string;
+          ruleKind?: 'CALENDAR' | 'INTERVAL';
+          intervalUnit?: 'HOURS' | 'DAYS' | 'WEEKS';
+          intervalValue?: number;
           userId?: string;
           userIds?: string[];
           specialMonth?: number;
@@ -596,19 +856,26 @@ export function previewResponse(path: string, init?: RequestInit): unknown | nul
       : {};
     const audience = (body.audience || 'ALL') as PreviewCampaign['audience'];
     const delivery = (body.delivery || 'NOW') as PreviewCampaign['delivery'];
+    const ruleKind =
+      delivery === 'RULE' ? (body.ruleKind === 'INTERVAL' ? 'INTERVAL' : 'CALENDAR') : 'CALENDAR';
+    const stamp = new Date().toISOString();
     const created: PreviewCampaign = {
       id: `n-${Date.now()}`,
       title: body.title || 'اعلان',
       body: body.body || '',
       audience,
       delivery,
+      ruleKind,
+      intervalUnit: ruleKind === 'INTERVAL' ? body.intervalUnit || 'DAYS' : null,
+      intervalValue: ruleKind === 'INTERVAL' ? Number(body.intervalValue) || 1 : null,
       userId: body.userId ?? null,
       userIds: body.userIds ?? [],
       specialMonth: body.specialMonth ?? null,
       specialDay: body.specialDay ?? null,
       active: delivery === 'RULE' ? body.active !== false : false,
       lastRunOn: null,
-      createdAt: new Date().toISOString(),
+      lastRunAt: delivery === 'RULE' || delivery === 'NOW' ? stamp : null,
+      createdAt: stamp,
       recipientCount: audience === 'ALL' ? previewCustomers.length : body.userIds?.length || (body.userId ? 1 : 0),
     };
     previewNotifications.unshift(created);
@@ -634,7 +901,11 @@ export function previewResponse(path: string, init?: RequestInit): unknown | nul
       if (previewDiscountCodes.some((row) => row.code === code)) {
         throw new Error('این کد قبلاً ثبت شده است');
       }
-      const member = previewCustomers.find((c) => c.id === body.userId) || previewCustomers[0]!;
+      const userId = body.userId?.trim() || null;
+      const member = userId ? previewCustomers.find((c) => c.id === userId) : null;
+      if (userId && !member) {
+        throw new Error('عضو باشگاه پیدا نشد');
+      }
       const created: PreviewDiscountCode = {
         id: `dc-${Date.now()}`,
         code: code || `CODE${previewDiscountCodes.length + 1}`,
@@ -642,7 +913,7 @@ export function previewResponse(path: string, init?: RequestInit): unknown | nul
         value: Number(body.value) || 10,
         minOrder: typeof body.minOrder === 'number' ? body.minOrder : null,
         maxDiscount: typeof body.maxDiscount === 'number' ? body.maxDiscount : null,
-        userId: member.id,
+        userId: member?.id ?? null,
         active: body.active !== false,
         startsAt: null,
         endsAt: body.endsAt || null,
@@ -650,7 +921,7 @@ export function previewResponse(path: string, init?: RequestInit): unknown | nul
         usedCount: 0,
         createdAt: new Date().toISOString(),
         createdById: 'staff-owner',
-        user: clubUserBrief(member),
+        user: member ? clubUserBrief(member) : null,
       };
       previewDiscountCodes.unshift(created);
       return created;
@@ -676,9 +947,90 @@ export function previewResponse(path: string, init?: RequestInit): unknown | nul
       return { ok: true };
     }
   }
+  if (path.includes('/admin/inventory/items/') && path.includes('/adjust') && method === 'POST') {
+    const id = path.split('/admin/inventory/items/')[1]?.split('/')[0] || '';
+    const body = init?.body ? (JSON.parse(String(init.body)) as { delta?: number }) : {};
+    const delta = Number(body.delta) || 0;
+    const idx = previewInventoryItems.findIndex((row) => row.id === id);
+    if (idx < 0) return { ok: false };
+    previewInventoryItems[idx] = presentPreviewItem({
+      ...previewInventoryItems[idx],
+      quantityOnHand: previewInventoryItems[idx].quantityOnHand + delta,
+    });
+    return previewInventoryItems[idx];
+  }
+  if (path.includes('/admin/inventory/items')) {
+    if (method === 'GET') return previewInventoryItems.map((row) => presentPreviewItem(row));
+    if (method === 'POST') {
+      const body = init?.body
+        ? (JSON.parse(String(init.body)) as {
+            name?: string;
+            unit?: string;
+            quantityOnHand?: number;
+            lowStockAt?: number | null;
+            active?: boolean;
+          })
+        : {};
+      const created = presentPreviewItem({
+        id: `inv-${Date.now()}`,
+        name: (body.name || 'ماده جدید').trim(),
+        unit: (body.unit || 'عدد').trim() || 'عدد',
+        quantityOnHand: Number(body.quantityOnHand) || 0,
+        lowStockAt: typeof body.lowStockAt === 'number' ? body.lowStockAt : null,
+        active: body.active !== false,
+      });
+      previewInventoryItems.unshift(created);
+      return created;
+    }
+    if (method === 'PUT') {
+      const id = path.split('/admin/inventory/items/')[1]?.split(/[/?]/)[0] || '';
+      const body = init?.body
+        ? (JSON.parse(String(init.body)) as {
+            name?: string;
+            unit?: string;
+            lowStockAt?: number | null;
+            active?: boolean;
+          })
+        : {};
+      const idx = previewInventoryItems.findIndex((row) => row.id === id);
+      if (idx < 0) return { ok: false };
+      previewInventoryItems[idx] = presentPreviewItem({
+        ...previewInventoryItems[idx],
+        name: body.name?.trim() || previewInventoryItems[idx].name,
+        unit: body.unit?.trim() || previewInventoryItems[idx].unit,
+        lowStockAt: body.lowStockAt === undefined ? previewInventoryItems[idx].lowStockAt : body.lowStockAt,
+        active: typeof body.active === 'boolean' ? body.active : previewInventoryItems[idx].active,
+      });
+      return previewInventoryItems[idx];
+    }
+    if (method === 'DELETE') {
+      const id = path.split('/admin/inventory/items/')[1]?.split(/[/?]/)[0] || '';
+      const inUse = [...previewRecipes.values()].some((lines) => lines.some((line) => line.inventoryItemId === id));
+      if (inUse) throw new Error('این ماده در دستور محصول استفاده شده است');
+      const idx = previewInventoryItems.findIndex((row) => row.id === id);
+      if (idx >= 0) previewInventoryItems.splice(idx, 1);
+      return { ok: true };
+    }
+  }
+  if (path.includes('/admin/inventory/recipes')) {
+    if (method === 'GET') return buildPreviewRecipes();
+    if (method === 'PUT') {
+      const productId = path.split('/admin/inventory/recipes/')[1]?.split(/[/?]/)[0] || '';
+      const body = init?.body
+        ? (JSON.parse(String(init.body)) as { lines?: { inventoryItemId: string; qtyPerUnit: number }[] })
+        : {};
+      const cleaned = (body.lines || [])
+        .filter((line) => line.inventoryItemId && Number(line.qtyPerUnit) > 0)
+        .map((line) => ({ inventoryItemId: line.inventoryItemId, qtyPerUnit: Number(line.qtyPerUnit) }));
+      previewRecipes.set(productId, cleaned);
+      return buildPreviewRecipes().find((row) => row.productId === productId) || { productId, lines: cleaned };
+    }
+  }
   if (path.includes('/admin/settings') || path.includes('/api/v1/config')) return previewSettings;
   if (path.includes('/admin/reports/summary')) return previewReport;
-  if (path.includes('/admin/uploads')) return { url: '' };
+  if (path.includes('/admin/uploads')) {
+    return { url: `https://picsum.photos/seed/cafejavid-upload/${Date.now()}/400/400` };
+  }
   // Mutations in preview: acknowledge without backend.
   // Never use this for order status — that must return a full Order (see PATCH handler above).
   if (method !== 'GET') {

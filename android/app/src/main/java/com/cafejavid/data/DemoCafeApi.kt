@@ -21,15 +21,23 @@ class DemoCafeApi : CafeApi {
         address = "بلوار ده‌حقی، نرسیده به بلوار نبرد، کافه جاوید",
         openingHours = "۸ تا ۲۳",
         acceptingOrders = true,
-        deliveryFee = 0,
+        deliveryFee = 45000,
         packagingFee = 55000,
-        minOrder = 0,
+        minOrder = 150000,
         tableCount = 10,
         onlinePaymentEnabled = false,
         receiptFooter = "نوش جان",
     )
 
-    private var user = UserDto(id = "demo-user", phone = "09123456789", name = "سارا", firstName = "سارا", customerCode = "CJ-1001")
+    private var user = UserDto(
+        id = "demo-user",
+        phone = "09123456789",
+        name = "سارا رضایی",
+        firstName = "سارا",
+        lastName = "رضایی",
+        birthDate = "1375/04/12",
+        customerCode = "CJ-1001",
+    )
     private val passwords = mutableMapOf<String, String>()
     private val profiles = mutableMapOf<String, UserDto>()
     private val addresses = mutableListOf(
@@ -43,11 +51,29 @@ class DemoCafeApi : CafeApi {
     )
     private val orders = mutableListOf<OrderDto>()
     private val idempotency = mutableMapOf<String, String>()
+    private val inbox = mutableListOf(
+        ServerNotificationDto(
+            id = "demo-notif-campaign",
+            title = "تخفیف باشگاه مشتریان",
+            body = "با کد DEMO20 تا ۲۰٪ تخفیف بگیر.",
+            createdAt = Instant.now().minusSeconds(7200).toString(),
+            read = false,
+        ),
+        ServerNotificationDto(
+            id = "demo-notif-hours",
+            title = "ساعات کاری",
+            body = "کافه جاوید هر روز از ۸ تا ۲۳ پذیرای شماست.",
+            createdAt = Instant.now().minusSeconds(86_400).toString(),
+            read = true,
+        ),
+    )
     private var nextNumber = 2001
 
     init {
         orders += sampleOrder()
         orders += pastOrder()
+        profiles[user.phone] = user
+        passwords[user.phone] = "1234"
     }
 
     override suspend fun config(): CafeConfig {
@@ -115,7 +141,19 @@ class DemoCafeApi : CafeApi {
     override suspend fun me(): UserDto = user
 
     override suspend fun updateMe(body: NameBody): UserDto {
-        user = user.copy(name = body.name)
+        val first = body.firstName?.trim().orEmpty()
+        val last = body.lastName?.trim().orEmpty()
+        val birth = body.birthDate?.trim().orEmpty()
+        val composed = body.name?.trim().orEmpty().ifBlank {
+            listOf(first, last).filter { it.isNotBlank() }.joinToString(" ")
+        }
+        user = user.copy(
+            name = composed.ifBlank { user.name },
+            firstName = if (body.firstName != null) first.ifBlank { null } else user.firstName,
+            lastName = if (body.lastName != null) last.ifBlank { null } else user.lastName,
+            birthDate = if (body.birthDate != null) birth.ifBlank { null } else user.birthDate,
+        )
+        profiles[user.phone] = user
         return user
     }
 
@@ -167,7 +205,12 @@ class DemoCafeApi : CafeApi {
         val catalog = products()
         val items = body.items.map { item ->
             val product = catalog.find { it.id == item.productId } ?: throw DemoException("یکی از آیتم‌ها در دسترس نیست")
-            if (product.soldOut) throw DemoException("یکی از آیتم‌ها تموم شده است")
+            if (product.isUnavailable()) {
+                throw DemoException(
+                    if (product.soldOut) "یکی از آیتم‌ها تموم شده است"
+                    else "یکی از آیتم‌ها خارج از زمان سرویس‌دهی است",
+                )
+            }
             val choices = product.optionGroups.flatMap { group -> group.choices.map { group to it } }
             val selected = item.choiceIds.map { id ->
                 choices.find { it.second.id == id } ?: throw DemoException("گزینه‌های انتخاب‌شده معتبر نیست")
@@ -256,6 +299,8 @@ class DemoCafeApi : CafeApi {
             val product = catalog.find { it.id == item.productId }
             if (product == null || product.soldOut) {
                 unavailable += UnavailableItem(item.productName, "در دسترس نیست")
+            } else if (product.isOutsideHoursBlocked()) {
+                unavailable += UnavailableItem(item.productName, "خارج از زمان سرویس‌دهی")
             } else {
                 items += ReorderItem(
                     productId = product.id,
@@ -271,9 +316,14 @@ class DemoCafeApi : CafeApi {
         return ReorderPreview(items, unavailable)
     }
 
-    override suspend fun myNotifications(): List<ServerNotificationDto> = emptyList()
+    override suspend fun myNotifications(): List<ServerNotificationDto> = inbox.toList()
 
-    override suspend fun markNotificationsRead(): OkDto = OkDto(ok = true)
+    override suspend fun markNotificationsRead(): OkDto {
+        for (i in inbox.indices) {
+            inbox[i] = inbox[i].copy(read = true)
+        }
+        return OkDto(ok = true)
+    }
 
     private fun advance(order: OrderDto): OrderDto {
         if (order.number < 2000 || order.status == "CANCELLED" || order.status == "DELIVERED") return order
@@ -292,18 +342,20 @@ class DemoCafeApi : CafeApi {
         val latte = line("p-1000004", "لته", 270000, 1, emptyList())
         val ice = line("p-1010001", "آیس آمریکانو", 190000, 1, emptyList())
         val cap = line("p-1000007", "کاپوچینو/کورتادو", 250000, 1, emptyList())
+        // number < 2000 so advance() leaves it alone — stays NEW for cancel UI testing
         return OrderDto(
             id = "ord-sample",
             number = 1248,
-            status = "PREPARING",
+            status = "NEW",
             fulfillment = "DELIVERY",
             subtotal = 710000,
-            deliveryFee = 0,
-            total = 710000,
+            deliveryFee = 45000,
+            packagingFee = 55000,
+            total = 810000,
             paymentMethod = "CASH",
             paymentStatus = "PENDING",
             estimatedMinutes = 25,
-            createdAt = Instant.now().minusSeconds(600).toString(),
+            createdAt = Instant.now().toString(),
             items = listOf(latte, ice, cap),
         )
     }
@@ -361,7 +413,22 @@ class DemoCafeApi : CafeApi {
         product("p-1000001", "cat-100", "اسپرسو(100)", "اسپرسو دبل شات (۱۰۰٪ روبوستا)", 150000, img("1000001.jpg")),
         product("p-1000002", "cat-100", "اسپرسو(70/30)", "اسپرسو دبل‌شات (۷۰٪ روبوستا / ۳۰٪ عربیکا)", 170000, img("1000002.jpg")),
         product("p-1000003", "cat-100", "آمریکانو/بلک", "", 190000),
-        product("p-1000004", "cat-100", "لته", "اسپرسو (۳۰٪ عربیکا) + شیر", 270000, img("1000004.jpg")),
+        product(
+            "p-1000004", "cat-100", "لته", "اسپرسو (۳۰٪ عربیکا) + شیر", 270000, img("1000004.jpg"),
+            groups = listOf(
+                GroupDto(
+                    id = "milk",
+                    name = "نوع شیر",
+                    type = "SINGLE",
+                    required = true,
+                    choices = listOf(
+                        ChoiceDto(id = "milk-regular", name = "شیر معمولی", priceDelta = 0, isDefault = true),
+                        ChoiceDto(id = "milk-oat", name = "شیر جو دوسر", priceDelta = 30000),
+                        ChoiceDto(id = "milk-almond", name = "شیر بادام", priceDelta = 35000),
+                    ),
+                ),
+            ),
+        ),
         product("p-1000005", "cat-100", "موکا", "اسپرسو (۳۰٪ عربیکا) + شیر + شکلات", 290000, img("1000005.png")),
         product("p-1000006", "cat-100", "کارامل ماکیاتو", "اسپرسو (۳۰٪ عربیکا) + شیر + کارامل", 290000),
         product("p-1000007", "cat-100", "کاپوچینو/کورتادو", "کاپوچینو: اسپرسو ۳۰/۷۰، شیر، فوم — کورتادو: اسپرسو ۳۰/۷۰، شیر (۱:۱)", 250000, img("1000007.jpg")),
@@ -376,9 +443,9 @@ class DemoCafeApi : CafeApi {
         product("p-1000016", "cat-100", "بون بون", "اسپرسو ۳۰/۷۰، شیر + عسل طبیعی", 295000, img("1000016.png")),
 
         // اسپرسو بار سرد
-        product("p-1010001", "cat-101", "آیس آمریکانو", "", 190000, img("1010001.png")),
-        product("p-1010002", "cat-101", "آیس لته", "", 270000),
-        product("p-1010003", "cat-101", "آیس موکا", "", 290000, img("1010003.png")),
+        product("p-1010001", "cat-101", "آیس آمریکانو", "", 190000, img("1010001.png"), serviceStartHour = 12, serviceEndHour = 22),
+        product("p-1010002", "cat-101", "آیس لته", "", 270000, serviceStartHour = 12, serviceEndHour = 22),
+        product("p-1010003", "cat-101", "آیس موکا", "", 290000, img("1010003.png"), outsideServiceHours = true),
         product("p-1010004", "cat-101", "آیس کارامل ماکیاتو", "", 290000),
         product("p-1010005", "cat-101", "اورنج اسپرسو", "اسپرسو ۳۰/۷۰، آب پرتقال تازه", 270000, img("1010005.png")),
         product("p-1010006", "cat-101", "آفوگاتو", "بستنی وانیلی، اسپرسو ۳۰/۷۰", 310000),
@@ -410,7 +477,7 @@ class DemoCafeApi : CafeApi {
         product("p-1050004", "cat-105", "شیک نوتلا", "", 370000, img("1050004.jpg")),
 
         // کیک و دسر
-        product("p-1060002", "cat-106", "چیز کیک سن‌سباستین", "", 325000, img("1060002.jpg")),
+        product("p-1060002", "cat-106", "چیز کیک سن‌سباستین", "", 325000, img("1060002.jpg"), soldOut = true),
         product("p-1060010", "cat-106", "دسر تیرامیسو", "بیسکوئیت لیدی‌فینگر + پنیر خامه‌ای + اسپرسو + پودر کاکائو", 325000, img("1060010.jpg")),
         product("p-1060011", "cat-106", "کیک شکلاتی", "", 315000),
         product("p-1060013", "cat-106", "کوکی کاکائویی (طرح قهوه)", "کوکی کاکائویی", 25000, img("1060013.jpg")),
@@ -419,9 +486,9 @@ class DemoCafeApi : CafeApi {
         product("p-1060021", "cat-106", "تیرامیسو تک‌نفره", "بیسکوئیت لیدی‌فینگر + پنیر خامه‌ای + اسپرسو + پودر کاکائو", 225000, img("1060021.jpg")),
 
         // صبحانه و میان‌وعده
-        product("p-1080001", "cat-108", "تست ژامبون پنیر", "", 250000),
-        product("p-1080002", "cat-108", "تست پنیر گردو", "", 130000),
-        product("p-1080003", "cat-108", "تست بادام‌زمینی", "", 200000),
+        product("p-1080001", "cat-108", "تست ژامبون پنیر", "", 250000, serviceStartHour = 7, serviceEndHour = 11),
+        product("p-1080002", "cat-108", "تست پنیر گردو", "", 130000, serviceStartHour = 7, serviceEndHour = 11),
+        product("p-1080003", "cat-108", "تست بادام‌زمینی", "", 200000, serviceStartHour = 7, serviceEndHour = 11),
         product("p-1080004", "cat-108", "تست بادام‌زمینی شکلات", "", 230000),
         product("p-1080005", "cat-108", "تست ژامبون گوشت", "", 230000),
         product("p-1080006", "cat-108", "تست ژامبون مرغ", "", 200000),
@@ -438,6 +505,9 @@ class DemoCafeApi : CafeApi {
         imageUrl: String? = null,
         featured: Boolean = false,
         soldOut: Boolean = false,
+        serviceStartHour: Int? = null,
+        serviceEndHour: Int? = null,
+        outsideServiceHours: Boolean? = null,
         groups: List<GroupDto> = emptyList(),
     ) = ProductDto(
         id = id,
@@ -448,6 +518,9 @@ class DemoCafeApi : CafeApi {
         imageUrl = imageUrl,
         featured = featured,
         soldOut = soldOut,
+        serviceStartHour = serviceStartHour,
+        serviceEndHour = serviceEndHour,
+        outsideServiceHours = outsideServiceHours,
         optionGroups = groups.map { it.copy(id = "$id-${it.id}") }.map { group ->
             group.copy(
                 name = toPersianDigits(group.name),

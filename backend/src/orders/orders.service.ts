@@ -1,6 +1,7 @@
 import { HttpStatus, Injectable } from '@nestjs/common';
 import { Fulfillment, PaymentMethod, PaymentStatus, Prisma } from '@prisma/client';
 import { ApiException } from '../common/api.exception';
+import { isOutsideServiceHours } from '../common/service-window';
 import { SettingsService } from '../cafe/settings.service';
 import { OrderEventsService } from '../events/order-events.service';
 import { NotificationsService } from '../notifications/notifications.service';
@@ -8,6 +9,7 @@ import { CashPaymentGateway, ZarinpalPaymentGateway } from '../payment/payment.g
 import { LogPushProvider } from '../push/push.provider';
 import { PrismaService } from '../prisma/prisma.service';
 import { DiscountsService } from '../discounts/discounts.service';
+import { InventoryService } from '../inventory/inventory.service';
 import { CreateOrderDto } from './dto';
 import { orderInclude, OrderWithRelations, presentOrder } from './present';
 import { PriceError, priceItem } from './pricing';
@@ -27,6 +29,7 @@ export class OrdersService {
     private readonly events: OrderEventsService,
     private readonly notifications: NotificationsService,
     private readonly discounts: DiscountsService,
+    private readonly inventory: InventoryService,
   ) {}
 
   async create(userId: string, dto: CreateOrderDto, idempotencyKey?: string) {
@@ -96,6 +99,13 @@ export class OrdersService {
         }
         if (product.soldOut) {
           throw new ApiException(HttpStatus.BAD_REQUEST, 'SOLD_OUT', 'یکی از آیتم‌ها تموم شده است');
+        }
+        if (isOutsideServiceHours(product.serviceStartHour, product.serviceEndHour)) {
+          throw new ApiException(
+            HttpStatus.BAD_REQUEST,
+            'OUTSIDE_SERVICE_HOURS',
+            'یکی از آیتم‌ها خارج از زمان سرویس‌دهی است',
+          );
         }
         let priced;
         try {
@@ -174,6 +184,11 @@ export class OrdersService {
           maxUses: applied.maxUses,
         });
       }
+      await this.inventory.consumeForOrder(
+        tx,
+        order.id,
+        lines.map((line) => ({ productId: line.product.id, quantity: line.quantity })),
+      );
       return order;
     });
 
@@ -228,6 +243,10 @@ export class OrdersService {
       });
       if (!product || product.hidden || product.soldOut) {
         unavailable.push({ productName: item.productName, reason: 'در دسترس نیست' });
+        continue;
+      }
+      if (isOutsideServiceHours(product.serviceStartHour, product.serviceEndHour)) {
+        unavailable.push({ productName: item.productName, reason: 'خارج از زمان سرویس‌دهی' });
         continue;
       }
       try {
@@ -329,6 +348,9 @@ export class OrdersService {
       },
       include: orderInclude,
     });
+    if (toStatus === 'CANCELLED' && current.status !== 'CANCELLED') {
+      await this.inventory.restoreForOrder(id);
+    }
     const presented = presentOrder(updated);
     this.events.updated(id, presented);
     await this.push.notify('order.updated', id);

@@ -10,6 +10,7 @@ body,
 
 :root {
   --color-primary: #1e4d3a;
+  --color-primary-deep: #143628;
   --color-accent: #f2b55a;
   --color-sand: #fbebcf;
   --color-tint: #e3ede6;
@@ -18,13 +19,19 @@ body,
   --timer-ok: var(--color-primary);
   --timer-warn: var(--color-accent);
   --timer-late: var(--color-danger);
+  --shadow-soft: 0 10px 30px rgba(23, 37, 30, 0.08);
+  --shadow-card: 0 8px 22px rgba(23, 37, 30, 0.06);
 }
 
 body {
   margin: 0;
-  background: #f4f6f2;
   color: #17251e;
   font-family: Vazirmatn, Tahoma, sans-serif;
+  background:
+    radial-gradient(1200px 520px at 100% -10%, rgba(242, 181, 90, 0.16), transparent 55%),
+    radial-gradient(900px 480px at -10% 20%, rgba(30, 77, 58, 0.1), transparent 50%),
+    linear-gradient(180deg, #f7f9f5 0%, #eef2ec 100%);
+  background-attachment: fixed;
 }
 
 button,
@@ -32,4 +39,71 @@ input,
 select,
 textarea {
   font-family: inherit;
+}
+
+@layer components {
+  .panel-page {
+    @apply p-5 md:p-7;
+  }
+
+  .panel-title {
+    @apply text-[1.55rem] font-bold tracking-tight text-ink;
+  }
+
+  .panel-subtitle {
+    @apply mt-1 text-sm text-muted;
+  }
+
+  .toolbar-chip {
+    @apply inline-flex h-10 items-center gap-2 rounded-full border border-line bg-white/90 px-4 text-sm shadow-sm backdrop-blur transition;
+  }
+
+  .toolbar-chip:hover {
+    @apply border-primary/30 bg-tint/50;
+  }
+
+  .toolbar-chip-on {
+    @apply border-primary/25 bg-tint text-primary;
+  }
+
+  .board-column {
+    @apply rounded-[22px] border border-white/70 p-3.5 shadow-[var(--shadow-soft)] backdrop-blur-sm;
+  }
+
+  .order-card {
+    @apply rounded-[18px] border border-line/80 bg-white/95 p-3.5 shadow-[var(--shadow-card)] transition duration-200;
+  }
+
+  .order-card:hover {
+    @apply -translate-y-0.5 shadow-[0_14px_28px_rgba(23,37,30,0.1)];
+  }
+
+  .order-card-flash {
+    animation: order-flash 1.2s ease;
+  }
+}
+
+@keyframes order-flash {
+  0%,
+  100% {
+    box-shadow: var(--shadow-card);
+  }
+  30% {
+    box-shadow: 0 0 0 3px rgba(242, 181, 90, 0.55), 0 14px 28px rgba(23, 37, 30, 0.1);
+  }
+}
+
+@keyframes nav-in {
+  from {
+    opacity: 0;
+    transform: translateX(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.shell-nav-link {
+  animation: nav-in 0.35s ease both;
 }

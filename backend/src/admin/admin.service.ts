@@ -77,6 +77,8 @@ export class AdminService {
         soldOut: dto.soldOut ?? false,
         hidden: dto.hidden ?? false,
         sortOrder: dto.sortOrder ?? 0,
+        serviceStartHour: normalizeServiceHour(dto.serviceStartHour),
+        serviceEndHour: normalizeServiceHour(dto.serviceEndHour),
         optionGroups: dto.optionGroups ? { create: this.groupCreates(dto.optionGroups) } : undefined,
       },
       include: productInclude,
@@ -103,6 +105,8 @@ export class AdminService {
           soldOut: dto.soldOut,
           hidden: dto.hidden,
           sortOrder: dto.sortOrder,
+          serviceStartHour: normalizeServiceHour(dto.serviceStartHour),
+          serviceEndHour: normalizeServiceHour(dto.serviceEndHour),
           optionGroups: dto.optionGroups ? { create: this.groupCreates(dto.optionGroups) } : undefined,
         },
         include: productInclude,
@@ -275,22 +279,27 @@ export class AdminService {
     }
   }
 
-  private presentClubMember(user: {
-    id: string;
-    phone: string;
-    customerCode?: string | null;
-    name: string | null;
-    firstName?: string | null;
-    lastName?: string | null;
-    birthDate: string | null;
-    orders: { total: number; createdAt: Date }[];
-  }) {
+  private presentClubMember(
+    user: {
+      id: string;
+      phone: string;
+      customerCode?: string | null;
+      name: string | null;
+      firstName?: string | null;
+      lastName?: string | null;
+      birthDate: string | null;
+      createdAt?: Date;
+      orders: { total: number; createdAt: Date }[];
+      _count?: { addresses?: number };
+    },
+    extras?: { includeProfile?: boolean },
+  ) {
     const totalSpent = user.orders.reduce((sum, order) => sum + order.total, 0);
     const last = user.orders.reduce<Date | null>(
       (acc, order) => (!acc || order.createdAt > acc ? order.createdAt : acc),
       null,
     );
-    return {
+    const base = {
       id: user.id,
       phone: user.phone,
       customerCode: user.customerCode ?? null,
@@ -302,6 +311,81 @@ export class AdminService {
       totalSpent,
       lastOrderAt: last ? last.toISOString() : null,
     };
+    if (!extras?.includeProfile) return base;
+    return {
+      ...base,
+      createdAt: user.createdAt ? user.createdAt.toISOString() : null,
+      addressCount: user._count?.addresses ?? 0,
+      averageOrderValue: user.orders.length ? Math.round(totalSpent / user.orders.length) : 0,
+    };
+  }
+
+  async getCustomer(id: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { id },
+      include: {
+        orders: {
+          where: { status: { not: 'CANCELLED' } },
+          select: { total: true, createdAt: true },
+        },
+        _count: { select: { addresses: true } },
+      },
+    });
+    if (!user) throw new ApiException(HttpStatus.NOT_FOUND, 'NOT_FOUND', 'مشتری پیدا نشد');
+    if (!user.customerCode) {
+      user.customerCode = await ensureCustomerCode(this.prisma, user.id);
+    }
+    return this.presentClubMember(user, { includeProfile: true });
+  }
+
+  async customerSummary(id: string, from: string, to: string) {
+    await this.ensureCustomer(id);
+    const start = new Date(`${from}T00:00:00.000+03:30`);
+    const end = new Date(`${to}T23:59:59.999+03:30`);
+    if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
+      throw new ApiException(HttpStatus.BAD_REQUEST, 'INVALID_DATE', 'بازه تاریخ معتبر نیست');
+    }
+    const orders = await this.prisma.order.findMany({
+      where: {
+        userId: id,
+        createdAt: { gte: start, lte: end },
+        status: { not: 'CANCELLED' },
+      },
+      include: { items: true },
+    });
+    return this.aggregateOrders(orders);
+  }
+
+  async customerOrders(id: string, limit = 30) {
+    await this.ensureCustomer(id);
+    const take = Math.min(100, Math.max(1, limit || 30));
+    const rows = await this.prisma.order.findMany({
+      where: { userId: id },
+      orderBy: { createdAt: 'desc' },
+      take,
+      select: {
+        id: true,
+        number: true,
+        status: true,
+        fulfillment: true,
+        total: true,
+        discountAmount: true,
+        discountCode: true,
+        createdAt: true,
+        items: { select: { productName: true, quantity: true, lineTotal: true } },
+      },
+    });
+    return rows.map((order) => ({
+      id: order.id,
+      number: order.number,
+      status: order.status,
+      fulfillment: order.fulfillment,
+      total: order.total,
+      discountAmount: order.discountAmount ?? 0,
+      discountCode: order.discountCode ?? null,
+      createdAt: order.createdAt.toISOString(),
+      itemCount: order.items.reduce((sum, item) => sum + item.quantity, 0),
+    }));
   }
 
   async report(from: string, to: string) {
@@ -314,14 +398,37 @@ export class AdminService {
       where: { createdAt: { gte: start, lte: end }, status: { not: 'CANCELLED' } },
       include: { items: true },
     });
+    const aggregated = this.aggregateOrders(orders);
+    return {
+      totalSales: aggregated.totalSales,
+      orderCount: aggregated.orderCount,
+      averageOrderValue: aggregated.averageOrderValue,
+      topProducts: aggregated.topProducts,
+      hourly: aggregated.hourly,
+    };
+  }
+
+  private aggregateOrders(
+    orders: {
+      total: number;
+      fulfillment: string;
+      discountAmount?: number | null;
+      createdAt: Date;
+      items: { productName: string; quantity: number; lineTotal: number }[];
+    }[],
+  ) {
     const totalSales = orders.reduce((sum, order) => sum + order.total, 0);
     const orderCount = orders.length;
-    const average = orderCount ? Math.round(totalSales / orderCount) : 0;
+    const averageOrderValue = orderCount ? Math.round(totalSales / orderCount) : 0;
     const productMap = new Map<string, { name: string; quantity: number; amount: number }>();
     const hours = Array.from({ length: 24 }, (_, hour) => ({ hour, count: 0 }));
+    const fulfillment: Record<string, number> = { DELIVERY: 0, PICKUP: 0, DINE_IN: 0 };
+    let discountTotal = 0;
     for (const order of orders) {
       const hour = tehranHour(order.createdAt);
       hours[hour].count += 1;
+      fulfillment[order.fulfillment] = (fulfillment[order.fulfillment] ?? 0) + 1;
+      discountTotal += order.discountAmount ?? 0;
       for (const item of order.items) {
         const row = productMap.get(item.productName) ?? { name: item.productName, quantity: 0, amount: 0 };
         row.quantity += item.quantity;
@@ -330,7 +437,21 @@ export class AdminService {
       }
     }
     const topProducts = [...productMap.values()].sort((a, b) => b.quantity - a.quantity).slice(0, 5);
-    return { totalSales, orderCount, averageOrderValue: average, topProducts, hourly: hours };
+    return {
+      totalSales,
+      orderCount,
+      averageOrderValue,
+      topProducts,
+      hourly: hours,
+      fulfillment,
+      discountTotal,
+    };
+  }
+
+  private async ensureCustomer(id: string) {
+    const user = await this.prisma.user.findUnique({ where: { id }, select: { id: true } });
+    if (!user) throw new ApiException(HttpStatus.NOT_FOUND, 'NOT_FOUND', 'مشتری پیدا نشد');
+    return user;
   }
 
   private groupCreates(groups: NonNullable<ProductWriteDto['optionGroups']>) {
@@ -379,4 +500,12 @@ function tehranHour(date: Date) {
     .formatToParts(date)
     .find((item) => item.type === 'hour');
   return Number(part?.value ?? 0);
+}
+
+/** Both hours required for a window; otherwise clear restriction. */
+function normalizeServiceHour(value: number | null | undefined): number | null {
+  if (value === null || value === undefined || Number.isNaN(Number(value))) return null;
+  const n = Math.trunc(Number(value));
+  if (n < 0 || n > 23) return null;
+  return n;
 }

@@ -32,6 +32,22 @@ export class CreateNotificationDto {
   @IsIn(['NOW', 'RULE'])
   delivery?: 'NOW' | 'RULE';
 
+  /** CALENDAR = birthday/special day; INTERVAL = every N hours/days/weeks */
+  @IsOptional()
+  @IsIn(['CALENDAR', 'INTERVAL'])
+  ruleKind?: 'CALENDAR' | 'INTERVAL';
+
+  @ValidateIf((o: CreateNotificationDto) => o.delivery === 'RULE' && o.ruleKind === 'INTERVAL')
+  @IsIn(['HOURS', 'DAYS', 'WEEKS'])
+  intervalUnit?: 'HOURS' | 'DAYS' | 'WEEKS';
+
+  @ValidateIf((o: CreateNotificationDto) => o.delivery === 'RULE' && o.ruleKind === 'INTERVAL')
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(365)
+  intervalValue?: number;
+
   @ValidateIf((o: CreateNotificationDto) => o.audience === 'USER')
   @IsString()
   userId?: string;

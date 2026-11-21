@@ -14,6 +14,7 @@ export default {
         accent: '#F2B55A',
         sand: '#FBEBCF',
         lilac: '#EDE6F2',
+        danger: '#B54A3A',
       },
       fontFamily: {
         sans: ['Vazirmatn', 'Tahoma', 'sans-serif'],

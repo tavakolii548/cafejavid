@@ -28,6 +28,12 @@ import { ApiException } from '../common/api.exception';
 import { OrderEventsService } from '../events/order-events.service';
 import { CreateDiscountCodeDto, UpdateDiscountCodeDto } from '../discounts/dto';
 import { DiscountsService } from '../discounts/discounts.service';
+import {
+  AdjustStockDto,
+  SetProductRecipeDto,
+  UpsertInventoryItemDto,
+} from '../inventory/dto';
+import { InventoryService } from '../inventory/inventory.service';
 import { CreateNotificationDto, UpdateNotificationRuleDto } from '../notifications/dto';
 import { NotificationsService } from '../notifications/notifications.service';
 import { OrdersService } from '../orders/orders.service';
@@ -42,6 +48,7 @@ import {
   SettingsDto,
   UpdateClubMemberDto,
 } from './dto';
+import { absolutizeMediaUrl, publicBaseUrl } from '../common/media-url';
 
 function uploadDir() {
   return process.env.UPLOAD_DIR || join(process.cwd(), 'uploads');
@@ -57,6 +64,7 @@ export class AdminController {
     private readonly events: OrderEventsService,
     private readonly notifications: NotificationsService,
     private readonly discounts: DiscountsService,
+    private readonly inventory: InventoryService,
   ) {}
 
   @Get('orders/stream')
@@ -158,9 +166,11 @@ export class AdminController {
       limits: { fileSize: 5 * 1024 * 1024 },
     }),
   )
-  upload(@UploadedFile() file?: Express.Multer.File) {
+  upload(@Req() req: Request, @UploadedFile() file?: Express.Multer.File) {
     if (!file) throw new ApiException(HttpStatus.BAD_REQUEST, 'FILE_REQUIRED', 'فایل انتخاب نشده است');
-    return { url: `/uploads/${file.filename}` };
+    const relative = `/uploads/${file.filename}`;
+    const url = absolutizeMediaUrl(relative, publicBaseUrl(req)) ?? relative;
+    return { url };
   }
 
   @Get('reports/summary')
@@ -174,6 +184,35 @@ export class AdminController {
   customers(@Req() req: Request & { user: AccessPayload }, @Query('q') q?: string) {
     assertOwner(req);
     return this.admin.customers(q);
+  }
+
+  @Get('customers/:id/summary')
+  customerSummary(
+    @Req() req: Request & { user: AccessPayload },
+    @Param('id') id: string,
+    @Query('from') from?: string,
+    @Query('to') to?: string,
+  ) {
+    assertOwner(req);
+    const day = tehranToday();
+    return this.admin.customerSummary(id, from || day, to || day);
+  }
+
+  @Get('customers/:id/orders')
+  customerOrders(
+    @Req() req: Request & { user: AccessPayload },
+    @Param('id') id: string,
+    @Query('limit') limit?: string,
+  ) {
+    assertOwner(req);
+    const take = limit ? Number(limit) : 30;
+    return this.admin.customerOrders(id, Number.isFinite(take) ? take : 30);
+  }
+
+  @Get('customers/:id')
+  customer(@Req() req: Request & { user: AccessPayload }, @Param('id') id: string) {
+    assertOwner(req);
+    return this.admin.getCustomer(id);
   }
 
   @Post('customers')
@@ -225,6 +264,9 @@ export class AdminController {
       body: body.body,
       audience: body.audience,
       delivery: body.delivery,
+      ruleKind: body.ruleKind,
+      intervalUnit: body.intervalUnit,
+      intervalValue: body.intervalValue,
       userId: body.userId,
       userIds: body.userIds,
       specialMonth: body.specialMonth,
@@ -264,6 +306,60 @@ export class AdminController {
   ) {
     assertOwner(req);
     return this.discounts.update(id, body);
+  }
+
+  @Get('inventory/items')
+  listInventoryItems(@Req() req: Request & { user: AccessPayload }) {
+    assertOwner(req);
+    return this.inventory.listItems();
+  }
+
+  @Post('inventory/items')
+  createInventoryItem(@Req() req: Request & { user: AccessPayload }, @Body() body: UpsertInventoryItemDto) {
+    assertOwner(req);
+    return this.inventory.createItem(body);
+  }
+
+  @Put('inventory/items/:id')
+  updateInventoryItem(
+    @Req() req: Request & { user: AccessPayload },
+    @Param('id') id: string,
+    @Body() body: UpsertInventoryItemDto,
+  ) {
+    assertOwner(req);
+    return this.inventory.updateItem(id, body);
+  }
+
+  @Post('inventory/items/:id/adjust')
+  adjustInventoryItem(
+    @Req() req: Request & { user: AccessPayload },
+    @Param('id') id: string,
+    @Body() body: AdjustStockDto,
+  ) {
+    assertOwner(req);
+    return this.inventory.adjustStock(id, body);
+  }
+
+  @Delete('inventory/items/:id')
+  deleteInventoryItem(@Req() req: Request & { user: AccessPayload }, @Param('id') id: string) {
+    assertOwner(req);
+    return this.inventory.deleteItem(id);
+  }
+
+  @Get('inventory/recipes')
+  listInventoryRecipes(@Req() req: Request & { user: AccessPayload }) {
+    assertOwner(req);
+    return this.inventory.listRecipes();
+  }
+
+  @Put('inventory/recipes/:productId')
+  setInventoryRecipe(
+    @Req() req: Request & { user: AccessPayload },
+    @Param('productId') productId: string,
+    @Body() body: SetProductRecipeDto,
+  ) {
+    assertOwner(req);
+    return this.inventory.setProductRecipe(productId, body);
   }
 
   @Get('settings')

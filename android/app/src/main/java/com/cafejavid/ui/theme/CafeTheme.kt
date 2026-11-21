@@ -31,6 +31,20 @@ val Border = Color(0xFFDDE4DE)
 val Background = Color(0xFFF4F6F2)
 val Sand = Color(0xFFFBEBCF)
 val Lilac = Color(0xFFEDE6F2)
+val Danger = Color(0xFFB42318)
+val SurfaceSoft = Color(0xFFF8FAF7)
+
+val SpaceXs = 6.dp
+val SpaceSm = 8.dp
+val SpaceMd = 14.dp
+val SpaceLg = 20.dp
+val SpaceXl = 28.dp
+
+val RadiusSm = 12.dp
+val RadiusMd = 14.dp
+val RadiusLg = 16.dp
+val RadiusCard = 18.dp
+val RadiusHero = 24.dp
 
 val Vazir = FontFamily(
     Font(R.font.vazirmatn_regular, FontWeight.Normal),
@@ -39,11 +53,67 @@ val Vazir = FontFamily(
 )
 
 private val CafeTypography = Typography(
-    headlineSmall = TextStyle(fontFamily = Vazir, fontWeight = FontWeight.Bold, fontSize = 22.sp, color = Ink),
-    titleMedium = TextStyle(fontFamily = Vazir, fontWeight = FontWeight.Bold, fontSize = 16.sp, color = Ink),
-    bodyMedium = TextStyle(fontFamily = Vazir, fontWeight = FontWeight.Normal, fontSize = 14.sp, color = Ink),
-    bodySmall = TextStyle(fontFamily = Vazir, fontWeight = FontWeight.Normal, fontSize = 12.sp, color = Muted),
-    labelLarge = TextStyle(fontFamily = Vazir, fontWeight = FontWeight.Bold, fontSize = 15.sp),
+    displaySmall = TextStyle(
+        fontFamily = Vazir,
+        fontWeight = FontWeight.Bold,
+        fontSize = 28.sp,
+        lineHeight = 36.sp,
+        color = Ink,
+    ),
+    headlineSmall = TextStyle(
+        fontFamily = Vazir,
+        fontWeight = FontWeight.Bold,
+        fontSize = 22.sp,
+        lineHeight = 30.sp,
+        color = Ink,
+    ),
+    titleLarge = TextStyle(
+        fontFamily = Vazir,
+        fontWeight = FontWeight.Bold,
+        fontSize = 18.sp,
+        lineHeight = 26.sp,
+        color = Ink,
+    ),
+    titleMedium = TextStyle(
+        fontFamily = Vazir,
+        fontWeight = FontWeight.Bold,
+        fontSize = 16.sp,
+        lineHeight = 24.sp,
+        color = Ink,
+    ),
+    bodyLarge = TextStyle(
+        fontFamily = Vazir,
+        fontWeight = FontWeight.Normal,
+        fontSize = 15.sp,
+        lineHeight = 24.sp,
+        color = Ink,
+    ),
+    bodyMedium = TextStyle(
+        fontFamily = Vazir,
+        fontWeight = FontWeight.Normal,
+        fontSize = 14.sp,
+        lineHeight = 22.sp,
+        color = Ink,
+    ),
+    bodySmall = TextStyle(
+        fontFamily = Vazir,
+        fontWeight = FontWeight.Normal,
+        fontSize = 12.sp,
+        lineHeight = 18.sp,
+        color = Muted,
+    ),
+    labelLarge = TextStyle(
+        fontFamily = Vazir,
+        fontWeight = FontWeight.Bold,
+        fontSize = 15.sp,
+        lineHeight = 20.sp,
+    ),
+    labelMedium = TextStyle(
+        fontFamily = Vazir,
+        fontWeight = FontWeight.Medium,
+        fontSize = 13.sp,
+        lineHeight = 18.sp,
+    ),
 )
 
 @Composable
@@ -53,10 +123,14 @@ fun CafeTheme(content: @Composable () -> Unit) {
             colorScheme = lightColorScheme(
                 primary = PrimaryGreen,
                 onPrimary = Color.White,
+                secondary = Accent,
+                onSecondary = Ink,
                 background = Background,
                 surface = Color.White,
+                surfaceVariant = PrimaryTint,
                 onBackground = Ink,
                 onSurface = Ink,
+                outline = Border,
             ),
             typography = CafeTypography,
             content = content,
@@ -76,13 +150,18 @@ fun CafeButton(
         onClick = onClick,
         enabled = enabled,
         modifier = modifier,
-        shape = RoundedCornerShape(16.dp),
-        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+        shape = RoundedCornerShape(RadiusLg),
+        contentPadding = PaddingValues(horizontal = 18.dp, vertical = 12.dp),
         colors = ButtonDefaults.buttonColors(
             containerColor = if (dark) Ink else PrimaryGreen,
             contentColor = Color.White,
             disabledContainerColor = Border,
             disabledContentColor = Muted,
+        ),
+        elevation = ButtonDefaults.buttonElevation(
+            defaultElevation = 0.dp,
+            pressedElevation = 0.dp,
+            disabledElevation = 0.dp,
         ),
     ) {
         androidx.compose.material3.Text(text, style = MaterialTheme.typography.labelLarge, color = Color.White)
@@ -100,9 +179,14 @@ fun CafeOutlinedButton(
         onClick = onClick,
         enabled = enabled,
         modifier = modifier,
-        shape = RoundedCornerShape(16.dp),
+        shape = RoundedCornerShape(RadiusLg),
+        contentPadding = PaddingValues(horizontal = 18.dp, vertical = 12.dp),
         border = androidx.compose.foundation.BorderStroke(1.dp, Border),
+        colors = ButtonDefaults.outlinedButtonColors(
+            contentColor = Ink,
+            disabledContentColor = Muted,
+        ),
     ) {
-        androidx.compose.material3.Text(text, color = Ink, style = MaterialTheme.typography.labelLarge)
+        androidx.compose.material3.Text(text, color = if (enabled) Ink else Muted, style = MaterialTheme.typography.labelLarge)
     }
 }

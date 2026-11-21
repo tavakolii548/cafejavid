@@ -56,9 +56,26 @@ enum NotificationDelivery {
   RULE
 }
 
+enum NotificationRuleKind {
+  CALENDAR
+  INTERVAL
+}
+
+enum NotificationIntervalUnit {
+  HOURS
+  DAYS
+  WEEKS
+}
+
 enum DiscountType {
   PERCENT
   FIXED
+}
+
+enum InventoryMovementType {
+  ADJUST
+  SALE
+  RESTORE
 }
 
 model User {
@@ -132,19 +149,63 @@ model Category {
 }
 
 model Product {
-  id           String        @id @default(cuid())
-  categoryId   String
-  name         String
-  description  String
-  price        Int
-  imageUrl     String?
-  featured     Boolean       @default(false)
-  soldOut      Boolean       @default(false)
-  hidden       Boolean       @default(false)
-  sortOrder    Int           @default(0)
-  category     Category      @relation(fields: [categoryId], references: [id])
-  optionGroups OptionGroup[]
-  orderItems   OrderItem[]
+  id               String              @id @default(cuid())
+  categoryId       String
+  name             String
+  description      String
+  price            Int
+  imageUrl         String?
+  featured         Boolean             @default(false)
+  soldOut          Boolean             @default(false)
+  hidden           Boolean             @default(false)
+  sortOrder        Int                 @default(0)
+  /// Tehran local hour 0–23; null = no window. Available while start <= hour < end (overnight if start > end).
+  serviceStartHour Int?
+  serviceEndHour   Int?
+  category         Category            @relation(fields: [categoryId], references: [id])
+  optionGroups     OptionGroup[]
+  orderItems       OrderItem[]
+  recipeLines      ProductRecipeLine[]
+}
+
+model InventoryItem {
+  id             String               @id @default(cuid())
+  name           String
+  /// Free-text unit label, e.g. گرم / عدد / میلی‌لیتر
+  unit           String
+  quantityOnHand Int                  @default(0)
+  lowStockAt     Int?
+  active         Boolean              @default(true)
+  createdAt      DateTime             @default(now())
+  updatedAt      DateTime             @updatedAt
+  recipeLines    ProductRecipeLine[]
+  movements      InventoryMovement[]
+}
+
+model ProductRecipeLine {
+  id              String        @id @default(cuid())
+  productId       String
+  inventoryItemId String
+  qtyPerUnit      Int
+  product         Product       @relation(fields: [productId], references: [id], onDelete: Cascade)
+  inventoryItem   InventoryItem @relation(fields: [inventoryItemId], references: [id], onDelete: Restrict)
+
+  @@unique([productId, inventoryItemId])
+  @@index([inventoryItemId])
+}
+
+model InventoryMovement {
+  id              String                 @id @default(cuid())
+  inventoryItemId String
+  type            InventoryMovementType
+  delta           Int
+  note            String?
+  orderId         String?
+  createdAt       DateTime               @default(now())
+  inventoryItem   InventoryItem          @relation(fields: [inventoryItemId], references: [id], onDelete: Cascade)
+
+  @@index([inventoryItemId, createdAt])
+  @@index([orderId])
 }
 
 model OptionGroup {
@@ -203,7 +264,8 @@ model DiscountCode {
   value       Int
   minOrder    Int?
   maxDiscount Int?
-  userId      String
+  /// null = usable by all customers
+  userId      String?
   active      Boolean              @default(true)
   startsAt    DateTime?
   endsAt      DateTime?
@@ -211,7 +273,7 @@ model DiscountCode {
   usedCount   Int                  @default(0)
   createdAt   DateTime             @default(now())
   createdById String?
-  user        User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user        User?                @relation(fields: [userId], references: [id], onDelete: Cascade)
   redemptions DiscountRedemption[]
 
   @@index([userId, active])
@@ -261,20 +323,24 @@ model Setting {
 }
 
 model NotificationCampaign {
-  id           String                @id @default(cuid())
-  title        String
-  body         String
-  audience     NotificationAudience
-  delivery     NotificationDelivery  @default(NOW)
-  userId       String?
-  userIds      String[]              @default([])
-  specialMonth Int?
-  specialDay   Int?
-  active       Boolean               @default(true)
-  lastRunOn    String?
-  createdById  String?
-  createdAt    DateTime              @default(now())
-  items        UserNotification[]
+  id            String                     @id @default(cuid())
+  title         String
+  body          String
+  audience      NotificationAudience
+  delivery      NotificationDelivery       @default(NOW)
+  ruleKind      NotificationRuleKind       @default(CALENDAR)
+  intervalUnit  NotificationIntervalUnit?
+  intervalValue Int?
+  userId        String?
+  userIds       String[]                   @default([])
+  specialMonth  Int?
+  specialDay    Int?
+  active        Boolean                    @default(true)
+  lastRunOn     String?
+  lastRunAt     DateTime?
+  createdById   String?
+  createdAt     DateTime                   @default(now())
+  items         UserNotification[]
 }
 
 model UserNotification {

@@ -70,6 +70,9 @@ export interface Product {
   soldOut: boolean;
   hidden: boolean;
   sortOrder: number;
+  /** Tehran hour 0–23; null/undefined = always orderable. */
+  serviceStartHour?: number | null;
+  serviceEndHour?: number | null;
   optionGroups: OptionGroup[];
 }
 

@@ -8,6 +8,22 @@ fun todayJalaliTehran(): Triple<Int, Int, Int> {
     return toJalaali(zoned.year, zoned.monthValue, zoned.dayOfMonth)
 }
 
+fun tehranHourNow(): Int = Instant.now().atZone(ZoneId.of("Asia/Tehran")).hour
+
+/**
+ * Same-day window: [start, end). Overnight when start > end.
+ * Null bounds = always open. Equal start/end = always open.
+ */
+fun isWithinServiceHours(startHour: Int?, endHour: Int?, hour: Int = tehranHourNow()): Boolean {
+    if (startHour == null || endHour == null) return true
+    if (startHour == endHour) return true
+    return if (startHour < endHour) hour in startHour until endHour
+    else hour >= startHour || hour < endHour
+}
+
+fun isOutsideServiceHours(startHour: Int?, endHour: Int?, hour: Int = tehranHourNow()): Boolean =
+    !isWithinServiceHours(startHour, endHour, hour)
+
 /** Accepts `yyyy/mm/dd` Jalali; returns month to day. */
 fun parseJalaliMonthDay(raw: String?): Pair<Int, Int>? {
     if (raw.isNullOrBlank()) return null
@@ -23,6 +39,30 @@ fun isBirthdayToday(birthDate: String?): Boolean {
     val monthDay = parseJalaliMonthDay(birthDate) ?: return false
     val today = todayJalaliTehran()
     return today.second == monthDay.first && today.third == monthDay.second
+}
+
+/** Parses `yyyy/mm/dd` Jalali into year, month, day. */
+fun parseJalaliDate(raw: String?): Triple<Int, Int, Int>? {
+    if (raw.isNullOrBlank()) return null
+    val parts = toEnglishDigits(raw).split('/').mapNotNull { it.filter(Char::isDigit).toIntOrNull() }
+    if (parts.size < 3) return null
+    val y = parts[0]
+    val m = parts[1]
+    val d = parts[2]
+    if (m !in 1..12 || d < 1 || d > jalaliMonthLength(y, m)) return null
+    return Triple(y, m, d)
+}
+
+fun formatJalaliDate(year: Int, month: Int, day: Int): String =
+    "%d/%02d/%02d".format(year, month, day)
+
+fun isLeapJalaliYear(jy: Int): Boolean = jalCal(jy).second == 0
+
+fun jalaliMonthLength(jy: Int, jm: Int): Int = when {
+    jm in 1..6 -> 31
+    jm in 7..11 -> 30
+    jm == 12 -> if (isLeapJalaliYear(jy)) 30 else 29
+    else -> 0
 }
 
 /** Gregorian to Jalali, ported from jalaali-js (MIT). */

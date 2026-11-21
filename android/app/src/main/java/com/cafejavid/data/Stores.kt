@@ -26,6 +26,8 @@ data class AppNotification(
     val body: String,
     val createdAt: Long = System.currentTimeMillis(),
     val read: Boolean = false,
+    /** "server" = panel/inbox campaign; "local" = in-app events */
+    val source: String = "local",
 )
 
 data class Session(
@@ -33,7 +35,10 @@ data class Session(
     val refreshToken: String? = null,
     val phone: String? = null,
     val name: String? = null,
+    val firstName: String? = null,
+    val lastName: String? = null,
     val birthDate: String? = null,
+    val customerCode: String? = null,
     val guest: Boolean = false,
 )
 
@@ -44,7 +49,10 @@ class SessionStore @Inject constructor(@ApplicationContext context: Context) {
     private val refresh = stringPreferencesKey("refresh")
     private val phone = stringPreferencesKey("phone")
     private val name = stringPreferencesKey("name")
+    private val firstName = stringPreferencesKey("first_name")
+    private val lastName = stringPreferencesKey("last_name")
     private val birthDate = stringPreferencesKey("birth_date")
+    private val customerCode = stringPreferencesKey("customer_code")
     private val guest = booleanPreferencesKey("guest")
 
     val session: Flow<Session> = store.data.map { prefs ->
@@ -53,7 +61,10 @@ class SessionStore @Inject constructor(@ApplicationContext context: Context) {
             refreshToken = prefs[refresh],
             phone = prefs[phone],
             name = prefs[name],
+            firstName = prefs[firstName],
+            lastName = prefs[lastName],
             birthDate = prefs[birthDate],
+            customerCode = prefs[customerCode],
             guest = prefs[guest] ?: false,
         )
     }
@@ -64,7 +75,12 @@ class SessionStore @Inject constructor(@ApplicationContext context: Context) {
             prefs[refresh] = response.refreshToken
             prefs[phone] = response.user.phone
             response.user.name?.let { prefs[name] = it } ?: prefs.remove(name)
+            response.user.firstName?.let { prefs[firstName] = it } ?: prefs.remove(firstName)
+            response.user.lastName?.let { prefs[lastName] = it } ?: prefs.remove(lastName)
             response.user.birthDate?.takeIf { it.isNotBlank() }?.let { prefs[birthDate] = it }
+                ?: prefs.remove(birthDate)
+            response.user.customerCode?.takeIf { it.isNotBlank() }?.let { prefs[customerCode] = it }
+                ?: prefs.remove(customerCode)
             prefs[guest] = false
         }
     }
@@ -78,6 +94,23 @@ class SessionStore @Inject constructor(@ApplicationContext context: Context) {
 
     suspend fun saveName(value: String) {
         store.edit { it[name] = value }
+    }
+
+    suspend fun saveProfile(
+        name: String?,
+        firstName: String?,
+        lastName: String?,
+        birthDate: String?,
+        customerCode: String?,
+    ) {
+        store.edit { prefs ->
+            name?.takeIf { it.isNotBlank() }?.let { prefs[this.name] = it } ?: prefs.remove(this.name)
+            firstName?.takeIf { it.isNotBlank() }?.let { prefs[this.firstName] = it } ?: prefs.remove(this.firstName)
+            lastName?.takeIf { it.isNotBlank() }?.let { prefs[this.lastName] = it } ?: prefs.remove(this.lastName)
+            birthDate?.takeIf { it.isNotBlank() }?.let { prefs[this.birthDate] = it } ?: prefs.remove(this.birthDate)
+            customerCode?.takeIf { it.isNotBlank() }?.let { prefs[this.customerCode] = it }
+                ?: prefs.remove(this.customerCode)
+        }
     }
 
     suspend fun setGuest() {
@@ -184,7 +217,10 @@ class WelcomeGate @Inject constructor(@ApplicationContext context: Context) {
 }
 
 @Singleton
-class NotificationStore @Inject constructor(@ApplicationContext context: Context) {
+class NotificationStore @Inject constructor(
+    @ApplicationContext context: Context,
+    private val systemNotifier: com.cafejavid.notifications.SystemNotifier,
+) {
     private val store = context.notificationStore
     private val itemsKey = stringPreferencesKey("items")
     private val birthdayYearKey = stringPreferencesKey("birthday_year")
@@ -199,19 +235,22 @@ class NotificationStore @Inject constructor(@ApplicationContext context: Context
     val unreadCount: Flow<Int> = notifications.map { list -> list.count { !it.read } }
 
     suspend fun push(title: String, body: String) {
+        val id = java.util.UUID.randomUUID().toString()
         store.edit { prefs ->
             val current = prefs[itemsKey]?.let { raw ->
                 runCatching { json.decodeFromString<List<AppNotification>>(raw) }.getOrDefault(emptyList())
             } ?: emptyList()
             val next = listOf(
                 AppNotification(
-                    id = java.util.UUID.randomUUID().toString(),
+                    id = id,
                     title = title,
                     body = body,
+                    source = "local",
                 ),
             ) + current
             prefs[itemsKey] = json.encodeToString(next.take(100))
         }
+        systemNotifier.notify(id, title, body)
     }
 
     suspend fun maybePushBirthday(birthDate: String?, displayName: String?) {
@@ -244,6 +283,7 @@ class NotificationStore @Inject constructor(@ApplicationContext context: Context
 
     suspend fun mergeServer(items: List<ServerNotificationDto>) {
         if (items.isEmpty()) return
+        val newlyUnread = mutableListOf<AppNotification>()
         store.edit { prefs ->
             val current = prefs[itemsKey]?.let { raw ->
                 runCatching { json.decodeFromString<List<AppNotification>>(raw) }.getOrDefault(emptyList())
@@ -254,17 +294,29 @@ class NotificationStore @Inject constructor(@ApplicationContext context: Context
                     java.time.Instant.parse(item.createdAt).toEpochMilli()
                 }.getOrDefault(System.currentTimeMillis())
                 val existing = byId[item.id]
-                byId[item.id] = AppNotification(
+                val read = existing?.read == true || item.read
+                val merged = AppNotification(
                     id = item.id,
                     title = item.title,
                     body = item.body,
                     createdAt = createdAt,
-                    read = existing?.read == true || item.read,
+                    read = read,
+                    source = "server",
                 )
+                if (existing == null && !read) {
+                    newlyUnread += merged
+                } else if (existing != null && existing.source != "server") {
+                    // Upgrade local-looking duplicate id to server source when inbox owns it.
+                    byId[item.id] = merged
+                }
+                byId[item.id] = merged
             }
             prefs[itemsKey] = json.encodeToString(
                 byId.values.sortedByDescending { it.createdAt }.take(100),
             )
+        }
+        for (item in newlyUnread) {
+            systemNotifier.notify(item.id, item.title, item.body)
         }
     }
 }

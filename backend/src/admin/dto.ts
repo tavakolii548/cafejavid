@@ -6,8 +6,10 @@ import {
   IsInt,
   IsOptional,
   IsString,
+  Max,
   MaxLength,
   Min,
+  ValidateIf,
   ValidateNested,
 } from 'class-validator';
 import { OptionType } from '@prisma/client';
@@ -99,6 +101,23 @@ export class ProductWriteDto {
   @Type(() => Number)
   @IsInt()
   sortOrder?: number;
+
+  /** Tehran hour 0–23; omit/null = no time limit (pair with serviceEndHour). */
+  @IsOptional()
+  @ValidateIf((_, v) => v !== null && v !== undefined)
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  @Max(23)
+  serviceStartHour?: number | null;
+
+  @IsOptional()
+  @ValidateIf((_, v) => v !== null && v !== undefined)
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  @Max(23)
+  serviceEndHour?: number | null;
 
   @IsOptional()
   @IsArray()

@@ -70,7 +70,10 @@ export function PriceInput({
       type="text"
       inputMode="numeric"
       dir="ltr"
-      className={className ?? 'h-12 w-full rounded-btn border border-line px-3'}
+      className={
+        className ??
+        'h-12 w-full rounded-btn border border-line bg-white px-3 outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/15'
+      }
       value={focused ? text : Number.isFinite(numeric) ? formatPriceGrouped(numeric) : text}
       placeholder={placeholder ? toPersianDigits(placeholder) : undefined}
       required={required}

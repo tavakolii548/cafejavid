@@ -1,5 +1,12 @@
 import { HttpStatus, Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
-import { NotificationAudience, NotificationDelivery, OrderStatus, Prisma } from '@prisma/client';
+import {
+  NotificationAudience,
+  NotificationDelivery,
+  NotificationIntervalUnit,
+  NotificationRuleKind,
+  OrderStatus,
+  Prisma,
+} from '@prisma/client';
 import { ApiException } from '../common/api.exception';
 import { jalaliDayKey, matchesMonthDay, personalize, tehranJalaliToday } from '../common/jalali.util';
 import { PrismaService } from '../prisma/prisma.service';
@@ -14,6 +21,14 @@ const STATUS_COPY: Partial<Record<OrderStatus, { title: string; body: string }>>
 
 type Audience = 'ALL' | 'USER' | 'MULTI' | 'BIRTHDAY' | 'SPECIAL_DAY';
 type Delivery = 'NOW' | 'RULE';
+type RuleKind = 'CALENDAR' | 'INTERVAL';
+type IntervalUnit = 'HOURS' | 'DAYS' | 'WEEKS';
+
+function intervalMs(unit: NotificationIntervalUnit | IntervalUnit, value: number) {
+  if (unit === 'HOURS') return value * 60 * 60 * 1000;
+  if (unit === 'DAYS') return value * 24 * 60 * 60 * 1000;
+  return value * 7 * 24 * 60 * 60 * 1000;
+}
 
 @Injectable()
 export class NotificationsService implements OnModuleInit, OnModuleDestroy {
@@ -23,7 +38,7 @@ export class NotificationsService implements OnModuleInit, OnModuleDestroy {
   constructor(private readonly prisma: PrismaService) {}
 
   onModuleInit() {
-    // هر ۱۵ دقیقه قوانین تولد/روز خاص را چک می‌کند
+    // هر ۱۵ دقیقه قوانین تولد/روز خاص و اعلان‌های دوره‌ای را چک می‌کند
     this.timer = setInterval(() => {
       void this.runDueRules().catch((err) => this.logger.warn(`notification rules: ${String(err)}`));
     }, 15 * 60 * 1000);
@@ -39,6 +54,9 @@ export class NotificationsService implements OnModuleInit, OnModuleDestroy {
     body: string;
     audience: Audience;
     delivery?: Delivery;
+    ruleKind?: RuleKind;
+    intervalUnit?: IntervalUnit;
+    intervalValue?: number;
     userId?: string;
     userIds?: string[];
     specialMonth?: number;
@@ -54,6 +72,7 @@ export class NotificationsService implements OnModuleInit, OnModuleDestroy {
 
     const audience = input.audience as NotificationAudience;
     let delivery = (input.delivery || 'NOW') as NotificationDelivery;
+    let ruleKind = (input.ruleKind || 'CALENDAR') as NotificationRuleKind;
     const userIds = [...new Set((input.userIds || []).filter(Boolean))];
     const today = tehranJalaliToday();
 
@@ -66,8 +85,8 @@ export class NotificationsService implements OnModuleInit, OnModuleDestroy {
       (input.specialMonth !== today.jm || input.specialDay !== today.jd)
     ) {
       delivery = NotificationDelivery.RULE;
+      ruleKind = NotificationRuleKind.CALENDAR;
     }
-    // تولد به‌صورت قانون وقتی صریحاً RULE باشد؛ BIRTHDAY+NOW = ارسال به متولدین امروز
 
     if (audience === NotificationAudience.USER) {
       if (!input.userId) throw new ApiException(HttpStatus.BAD_REQUEST, 'USER_REQUIRED', 'مشتری را انتخاب کنید');
@@ -87,31 +106,53 @@ export class NotificationsService implements OnModuleInit, OnModuleDestroy {
     }
 
     if (delivery === NotificationDelivery.RULE) {
-      if (
+      const isInterval = ruleKind === NotificationRuleKind.INTERVAL;
+      if (isInterval) {
+        if (
+          audience !== NotificationAudience.ALL &&
+          audience !== NotificationAudience.USER &&
+          audience !== NotificationAudience.MULTI
+        ) {
+          throw new ApiException(
+            HttpStatus.BAD_REQUEST,
+            'INTERVAL_AUDIENCE',
+            'اعلان دوره‌ای فقط برای همه، یک مشتری یا چند مشتری است',
+          );
+        }
+        if (!input.intervalUnit || !input.intervalValue || input.intervalValue < 1) {
+          throw new ApiException(HttpStatus.BAD_REQUEST, 'INTERVAL_REQUIRED', 'فاصله تکرار را مشخص کنید');
+        }
+      } else if (
         audience !== NotificationAudience.BIRTHDAY &&
         audience !== NotificationAudience.SPECIAL_DAY
       ) {
         throw new ApiException(
           HttpStatus.BAD_REQUEST,
           'RULE_UNSUPPORTED',
-          'قانون خودکار فقط برای تولد یا روز خاص است',
+          'قانون تقویمی فقط برای تولد یا روز خاص است',
         );
       }
+
       const campaign = await this.prisma.notificationCampaign.create({
         data: {
           title,
           body,
           audience,
           delivery,
-          userId: null,
-          userIds: audience === NotificationAudience.SPECIAL_DAY ? userIds : [],
+          ruleKind: isInterval ? NotificationRuleKind.INTERVAL : NotificationRuleKind.CALENDAR,
+          intervalUnit: isInterval ? (input.intervalUnit as NotificationIntervalUnit) : null,
+          intervalValue: isInterval ? input.intervalValue! : null,
+          userId: audience === NotificationAudience.USER ? input.userId! : null,
+          userIds:
+            audience === NotificationAudience.MULTI || audience === NotificationAudience.SPECIAL_DAY
+              ? userIds
+              : [],
           specialMonth: audience === NotificationAudience.SPECIAL_DAY ? input.specialMonth! : null,
           specialDay: audience === NotificationAudience.SPECIAL_DAY ? input.specialDay! : null,
           active: input.active ?? true,
           createdById: input.createdById ?? null,
         },
       });
-      // اگر همین امروز صدق می‌کند، همان لحظه هم اجرا شود
       await this.executeRule(campaign.id);
       return this.toCampaignDto(await this.loadCampaign(campaign.id));
     }
@@ -134,12 +175,14 @@ export class NotificationsService implements OnModuleInit, OnModuleDestroy {
         body,
         audience,
         delivery: NotificationDelivery.NOW,
+        ruleKind: NotificationRuleKind.CALENDAR,
         userId: audience === NotificationAudience.USER ? input.userId! : null,
         userIds: audience === NotificationAudience.MULTI || audience === NotificationAudience.SPECIAL_DAY ? userIds : [],
         specialMonth: audience === NotificationAudience.SPECIAL_DAY ? input.specialMonth ?? null : null,
         specialDay: audience === NotificationAudience.SPECIAL_DAY ? input.specialDay ?? null : null,
         active: false,
         lastRunOn: jalaliDayKey(),
+        lastRunAt: new Date(),
         createdById: input.createdById ?? null,
         items: {
           create: recipients.map((user) => ({
@@ -250,20 +293,31 @@ export class NotificationsService implements OnModuleInit, OnModuleDestroy {
     const campaign = await this.prisma.notificationCampaign.findUnique({ where: { id: campaignId } });
     if (!campaign || campaign.delivery !== NotificationDelivery.RULE || !campaign.active) return;
 
+    const now = new Date();
     const today = tehranJalaliToday();
     const dayKey = jalaliDayKey(today);
-    if (campaign.lastRunOn === dayKey) return;
+    const isInterval = campaign.ruleKind === NotificationRuleKind.INTERVAL;
 
-    let due = false;
-    if (campaign.audience === NotificationAudience.BIRTHDAY) {
-      due = true;
-    } else if (campaign.audience === NotificationAudience.SPECIAL_DAY) {
-      due = campaign.specialMonth === today.jm && campaign.specialDay === today.jd;
+    if (isInterval) {
+      if (!campaign.intervalUnit || !campaign.intervalValue || campaign.intervalValue < 1) return;
+      if (campaign.lastRunAt) {
+        const nextAt = campaign.lastRunAt.getTime() + intervalMs(campaign.intervalUnit, campaign.intervalValue);
+        if (now.getTime() < nextAt) return;
+      }
+    } else {
+      if (campaign.lastRunOn === dayKey) return;
+      let due = false;
+      if (campaign.audience === NotificationAudience.BIRTHDAY) {
+        due = true;
+      } else if (campaign.audience === NotificationAudience.SPECIAL_DAY) {
+        due = campaign.specialMonth === today.jm && campaign.specialDay === today.jd;
+      }
+      if (!due) return;
     }
-    if (!due) return;
 
     const recipients = await this.resolveRecipients({
       audience: campaign.audience as Audience,
+      userId: campaign.userId ?? undefined,
       userIds: campaign.userIds,
       specialMonth: campaign.specialMonth ?? undefined,
       specialDay: campaign.specialDay ?? undefined,
@@ -272,7 +326,7 @@ export class NotificationsService implements OnModuleInit, OnModuleDestroy {
     if (recipients.length === 0) {
       await this.prisma.notificationCampaign.update({
         where: { id: campaign.id },
-        data: { lastRunOn: dayKey },
+        data: { lastRunOn: dayKey, lastRunAt: now },
       });
       return;
     }
@@ -288,7 +342,7 @@ export class NotificationsService implements OnModuleInit, OnModuleDestroy {
       }),
       this.prisma.notificationCampaign.update({
         where: { id: campaign.id },
-        data: { lastRunOn: dayKey },
+        data: { lastRunOn: dayKey, lastRunAt: now },
       }),
     ]);
   }
@@ -367,12 +421,16 @@ export class NotificationsService implements OnModuleInit, OnModuleDestroy {
     body: string;
     audience: NotificationAudience;
     delivery: NotificationDelivery;
+    ruleKind: NotificationRuleKind;
+    intervalUnit: NotificationIntervalUnit | null;
+    intervalValue: number | null;
     userId: string | null;
     userIds: string[];
     specialMonth: number | null;
     specialDay: number | null;
     active: boolean;
     lastRunOn: string | null;
+    lastRunAt: Date | null;
     createdAt: Date;
     _count: { items: number };
   }) {
@@ -382,12 +440,16 @@ export class NotificationsService implements OnModuleInit, OnModuleDestroy {
       body: row.body,
       audience: row.audience,
       delivery: row.delivery,
+      ruleKind: row.ruleKind,
+      intervalUnit: row.intervalUnit,
+      intervalValue: row.intervalValue,
       userId: row.userId,
       userIds: row.userIds,
       specialMonth: row.specialMonth,
       specialDay: row.specialDay,
       active: row.active,
       lastRunOn: row.lastRunOn,
+      lastRunAt: row.lastRunAt?.toISOString() ?? null,
       createdAt: row.createdAt.toISOString(),
       recipientCount: row._count.items,
     };

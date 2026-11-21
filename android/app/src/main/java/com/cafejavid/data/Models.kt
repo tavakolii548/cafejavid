@@ -71,7 +71,12 @@ data class ServerNotificationDto(
 data class OkDto(val ok: Boolean = true)
 
 @Serializable
-data class NameBody(val name: String)
+data class NameBody(
+    val name: String? = null,
+    val firstName: String? = null,
+    val lastName: String? = null,
+    val birthDate: String? = null,
+)
 
 @Serializable
 data class AddressDto(
@@ -109,8 +114,21 @@ data class ProductDto(
     val imageUrl: String? = null,
     val featured: Boolean = false,
     val soldOut: Boolean = false,
+    val serviceStartHour: Int? = null,
+    val serviceEndHour: Int? = null,
+    /** When non-null, prefer server-computed flag over local hour math. */
+    val outsideServiceHours: Boolean? = null,
     val optionGroups: List<GroupDto> = emptyList(),
 )
+
+/** Sold out or outside service hours (server flag preferred when present). */
+fun ProductDto.isUnavailable(): Boolean {
+    if (soldOut) return true
+    return outsideServiceHours ?: com.cafejavid.util.isOutsideServiceHours(serviceStartHour, serviceEndHour)
+}
+
+fun ProductDto.isOutsideHoursBlocked(): Boolean =
+    !soldOut && (outsideServiceHours ?: com.cafejavid.util.isOutsideServiceHours(serviceStartHour, serviceEndHour))
 
 @Serializable
 data class CategoryDto(
@@ -177,11 +195,19 @@ data class CreateItemBody(
 )
 
 @Serializable
+data class InlineAddressBody(
+    val title: String,
+    val details: String,
+    val lat: Double,
+    val lng: Double,
+)
+
+@Serializable
 data class CreateOrderBody(
     val fulfillment: String,
     val tableNumber: Int? = null,
     val addressId: String? = null,
-    val address: AddressDto? = null,
+    val address: InlineAddressBody? = null,
     val paymentMethod: String,
     val note: String? = null,
     val discountCode: String? = null,

@@ -7,6 +7,7 @@ import { EventsModule } from './events/events.module';
 import { HealthController } from './health.controller';
 import { MenuModule } from './menu/menu.module';
 import { DiscountsModule } from './discounts/discounts.module';
+import { InventoryModule } from './inventory/inventory.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { OrdersModule } from './orders/orders.module';
 import { PrismaModule } from './prisma/prisma.module';
@@ -22,6 +23,7 @@ import { PrismaModule } from './prisma/prisma.module';
     OrdersModule,
     NotificationsModule,
     DiscountsModule,
+    InventoryModule,
     AdminModule,
   ],
   controllers: [HealthController],

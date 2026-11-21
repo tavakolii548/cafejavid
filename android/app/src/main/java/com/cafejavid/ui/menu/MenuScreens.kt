@@ -1,8 +1,13 @@
 package com.cafejavid.ui.menu
 
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -40,6 +45,7 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -48,6 +54,9 @@ import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -82,15 +91,22 @@ import com.cafejavid.data.ProductDto
 import com.cafejavid.data.SessionStore
 import com.cafejavid.data.WelcomeContent
 import com.cafejavid.data.WelcomeGate
+import com.cafejavid.data.isOutsideHoursBlocked
+import com.cafejavid.data.isUnavailable
+import com.cafejavid.ui.common.SoftCardShape
+import com.cafejavid.ui.common.cafeScreenEnter
 import com.cafejavid.ui.theme.Accent
 import com.cafejavid.ui.theme.Background
 import com.cafejavid.ui.theme.Border
 import com.cafejavid.ui.theme.CafeButton
 import com.cafejavid.ui.theme.Ink
 import com.cafejavid.ui.theme.Lilac
+import com.cafejavid.util.resolveMediaUrl
 import com.cafejavid.ui.theme.Muted
 import com.cafejavid.ui.theme.PrimaryGreen
 import com.cafejavid.ui.theme.PrimaryTint
+import com.cafejavid.ui.theme.RadiusCard
+import com.cafejavid.ui.theme.RadiusMd
 import com.cafejavid.ui.theme.Sand
 import com.cafejavid.util.formatPrice
 import com.cafejavid.util.toPersianDigits
@@ -106,6 +122,8 @@ import javax.inject.Inject
 data class MenuState(
     val menu: MenuResponse? = null,
     val cafeName: String = "",
+    val openingHours: String = "",
+    val acceptingOrders: Boolean = true,
     val categoryId: String? = null,
     val loading: Boolean = true,
     val error: String? = null,
@@ -142,17 +160,33 @@ class MenuViewModel @Inject constructor(
         _welcome.value = null
     }
 
-    fun refresh() {
+    fun refresh(quiet: Boolean = false) {
         viewModelScope.launch {
-            _state.update { it.copy(loading = true, error = null) }
+            if (!quiet) _state.update { it.copy(loading = true, error = null) }
             runCatching {
                 val config = api.config()
                 val menu = api.menu()
                 config to menu
             }.onSuccess { (config, menu) ->
-                _state.update { it.copy(loading = false, menu = menu, cafeName = config.cafeName) }
+                _state.update {
+                    it.copy(
+                        loading = false,
+                        menu = menu,
+                        cafeName = config.cafeName,
+                        openingHours = config.openingHours,
+                        acceptingOrders = config.acceptingOrders,
+                        error = null,
+                    )
+                }
             }.onFailure {
-                _state.update { it.copy(loading = false, error = "network") }
+                if (!quiet || _state.value.menu == null) {
+                    _state.update { it.copy(loading = false, error = "network") }
+                }
+            }
+            val token = session.session.first().accessToken
+            if (!token.isNullOrBlank()) {
+                runCatching { api.myNotifications() }
+                    .onSuccess { notifications.mergeServer(it) }
             }
         }
     }
@@ -160,6 +194,7 @@ class MenuViewModel @Inject constructor(
     fun select(id: String?) = _state.update { it.copy(categoryId = id) }
 
     fun addSimple(product: ProductDto) {
+        if (product.isUnavailable()) return
         viewModelScope.launch {
             cart.update { lines ->
                 val existing = lines.indexOfFirst { it.productId == product.id && it.choiceIds.isEmpty() && it.note.isNullOrBlank() }
@@ -339,17 +374,48 @@ fun MenuScreen(
     val unread by vm.unreadNotifications.collectAsState(0)
     val welcomeContent by vm.welcomeContent.collectAsState()
     val network = stringResource(R.string.error_network)
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) vm.refresh(quiet = true)
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
     welcomeContent?.let { content ->
         WelcomeDialog(content = content, onDismiss = vm::dismissWelcome)
     }
     Column(Modifier.fillMaxSize().background(Background)) {
-        Row(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 16.dp), verticalAlignment = Alignment.CenterVertically) {
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .cafeScreenEnter()
+                .padding(horizontal = 20.dp, vertical = 16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
             Column(Modifier.weight(1f)) {
-                Text(stringResource(R.string.hello), style = MaterialTheme.typography.bodySmall)
-                Text(state.cafeName.ifBlank { stringResource(R.string.app_name) }, style = MaterialTheme.typography.headlineSmall)
+                Text(stringResource(R.string.hello), style = MaterialTheme.typography.bodySmall, color = Muted)
+                Text(
+                    state.cafeName.ifBlank { stringResource(R.string.app_name) },
+                    style = MaterialTheme.typography.headlineSmall,
+                )
+                if (state.openingHours.isNotBlank()) {
+                    Text(
+                        stringResource(R.string.opening_hours, toPersianDigits(state.openingHours)),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = Muted,
+                    )
+                }
             }
             Box {
-                IconButton(onClick = onNotifications, modifier = Modifier.size(44.dp).border(1.dp, Border, RoundedCornerShape(14.dp))) {
+                IconButton(
+                    onClick = onNotifications,
+                    modifier = Modifier
+                        .size(46.dp)
+                        .clip(RoundedCornerShape(RadiusMd))
+                        .background(Color.White)
+                        .border(1.dp, Border, RoundedCornerShape(RadiusMd)),
+                ) {
                     Icon(Icons.Outlined.Notifications, stringResource(R.string.notifications), tint = Ink)
                 }
                 if (unread > 0) {
@@ -364,6 +430,20 @@ fun MenuScreen(
                 }
             }
         }
+        if (!state.acceptingOrders) {
+            Text(
+                stringResource(R.string.not_accepting_detail),
+                modifier = Modifier
+                    .padding(horizontal = 20.dp)
+                    .padding(bottom = 10.dp)
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(RadiusMd))
+                    .background(PrimaryTint)
+                    .padding(horizontal = 14.dp, vertical = 12.dp),
+                color = PrimaryGreen,
+                style = MaterialTheme.typography.bodyMedium,
+            )
+        }
         if (state.error != null) {
             Column(Modifier.padding(20.dp)) {
                 Text(network)
@@ -373,13 +453,23 @@ fun MenuScreen(
         val menu = state.menu
         if (menu != null) {
             val chips = listOf<Pair<String?, String>>(null to stringResource(R.string.all)) + menu.categories.map { it.id to it.name }
-            Row(Modifier.horizontalScroll(rememberScrollState()).padding(horizontal = 20.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(
+                Modifier.horizontalScroll(rememberScrollState()).padding(horizontal = 20.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
                 chips.forEach { (id, label) ->
                     val selected = state.categoryId == id
                     Text(
                         label,
-                        modifier = Modifier.height(40.dp).clip(RoundedCornerShape(20.dp)).background(if (selected) PrimaryGreen else Color.White).border(1.dp, Border, RoundedCornerShape(20.dp)).clickable { vm.select(id) }.padding(horizontal = 16.dp, vertical = 10.dp),
+                        modifier = Modifier
+                            .height(42.dp)
+                            .clip(RoundedCornerShape(RadiusMd))
+                            .background(if (selected) PrimaryGreen else Color.White)
+                            .border(1.dp, if (selected) PrimaryGreen else Border, RoundedCornerShape(RadiusMd))
+                            .clickable { vm.select(id) }
+                            .padding(horizontal = 16.dp, vertical = 11.dp),
                         color = if (selected) Color.White else Ink,
+                        style = MaterialTheme.typography.labelMedium,
                     )
                 }
             }
@@ -405,29 +495,59 @@ fun MenuScreen(
                     },
                     style = MaterialTheme.typography.titleMedium,
                 )
-                Spacer(Modifier.height(10.dp))
+                Spacer(Modifier.height(12.dp))
                 products.forEachIndexed { index, product ->
                     ProductRow(product, index, onOpen = { onProduct(product.id) }, onAdd = {
                         if (product.optionGroups.isEmpty()) vm.addSimple(product) else onProduct(product.id)
                     })
-                    Spacer(Modifier.height(10.dp))
+                    Spacer(Modifier.height(12.dp))
                 }
                 Spacer(Modifier.height(if (cart.isEmpty()) 12.dp else 88.dp))
             }
         }
-        if (cart.isNotEmpty()) {
+        AnimatedVisibility(
+            visible = cart.isNotEmpty(),
+            enter = slideInVertically(initialOffsetY = { it }) + fadeIn(),
+            exit = slideOutVertically(targetOffsetY = { it }) + fadeOut(),
+        ) {
             val count = cart.sumOf { it.quantity }
             val total = cart.sumOf { it.unitPrice * it.quantity }
             Row(
-                Modifier.padding(horizontal = 20.dp, vertical = 8.dp).fillMaxWidth().height(64.dp).clip(RoundedCornerShape(18.dp)).background(Ink).clickable(onClick = onCart).padding(horizontal = 16.dp),
+                Modifier
+                    .padding(horizontal = 20.dp, vertical = 10.dp)
+                    .fillMaxWidth()
+                    .height(64.dp)
+                    .shadow(
+                        14.dp,
+                        RoundedCornerShape(RadiusCard),
+                        ambientColor = Ink.copy(alpha = 0.18f),
+                        spotColor = Ink.copy(alpha = 0.22f),
+                    )
+                    .clip(RoundedCornerShape(RadiusCard))
+                    .background(
+                        Brush.horizontalGradient(listOf(Ink, Color(0xFF243830))),
+                    )
+                    .clickable(onClick = onCart)
+                    .padding(horizontal = 16.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Box(Modifier.size(28.dp).background(Accent, RoundedCornerShape(10.dp)), contentAlignment = Alignment.Center) {
-                    Text(toPersianDigits(count), color = Ink, style = MaterialTheme.typography.bodySmall)
+                Box(
+                    Modifier
+                        .size(30.dp)
+                        .clip(RoundedCornerShape(10.dp))
+                        .background(Accent),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(toPersianDigits(count), color = Ink, style = MaterialTheme.typography.labelMedium)
                 }
-                Spacer(Modifier.width(10.dp))
-                Text(stringResource(R.string.view_cart), color = Color.White, modifier = Modifier.weight(1f))
-                Text(formatPrice(total), color = Color.White)
+                Spacer(Modifier.width(12.dp))
+                Text(
+                    stringResource(R.string.view_cart),
+                    color = Color.White,
+                    style = MaterialTheme.typography.labelLarge,
+                    modifier = Modifier.weight(1f),
+                )
+                Text(formatPrice(total), color = Color.White, style = MaterialTheme.typography.titleMedium)
             }
         }
     }
@@ -436,38 +556,88 @@ fun MenuScreen(
 @Composable
 private fun FeaturedCard(product: ProductDto, onClick: () -> Unit) {
     Row(
-        Modifier.fillMaxWidth().clip(RoundedCornerShape(22.dp)).background(PrimaryGreen).clickable(onClick = onClick).padding(16.dp),
+        Modifier
+            .fillMaxWidth()
+            .shadow(
+                12.dp,
+                RoundedCornerShape(22.dp),
+                ambientColor = PrimaryGreen.copy(alpha = 0.2f),
+                spotColor = PrimaryGreen.copy(alpha = 0.28f),
+            )
+            .clip(RoundedCornerShape(22.dp))
+            .background(
+                Brush.horizontalGradient(listOf(Color(0xFF163A2C), PrimaryGreen, Color(0xFF2A6B4F))),
+            )
+            .clickable(onClick = onClick)
+            .padding(16.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Column(Modifier.weight(1f)) {
-            Text(stringResource(R.string.featured_badge), color = Ink, modifier = Modifier.background(Accent, RoundedCornerShape(12.dp)).padding(horizontal = 8.dp, vertical = 4.dp), style = MaterialTheme.typography.bodySmall)
-            Spacer(Modifier.height(8.dp))
-            Text(product.name, color = Color.White, style = MaterialTheme.typography.titleMedium)
-            Text(product.description, color = Color.White.copy(alpha = 0.85f), style = MaterialTheme.typography.bodySmall)
+            Text(
+                stringResource(R.string.featured_badge),
+                color = Ink,
+                modifier = Modifier
+                    .background(Accent, RoundedCornerShape(12.dp))
+                    .padding(horizontal = 10.dp, vertical = 5.dp),
+                style = MaterialTheme.typography.labelMedium,
+            )
+            Spacer(Modifier.height(10.dp))
+            Text(product.name, color = Color.White, style = MaterialTheme.typography.titleLarge)
+            if (product.description.isNotBlank()) {
+                Spacer(Modifier.height(4.dp))
+                Text(product.description, color = Color.White.copy(alpha = 0.82f), style = MaterialTheme.typography.bodySmall)
+            }
         }
-        ProductArt(product.imageUrl, PrimaryTint, Modifier.size(72.dp))
+        ProductArt(product.imageUrl, PrimaryTint, Modifier.size(76.dp))
     }
 }
 
 @Composable
 private fun ProductRow(product: ProductDto, index: Int, onOpen: () -> Unit, onAdd: () -> Unit) {
     val tint = listOf(PrimaryTint, Sand, Lilac)[index % 3]
+    val blocked = product.isUnavailable()
+    val outsideHours = product.isOutsideHoursBlocked()
     Row(
-        Modifier.fillMaxWidth().alpha(if (product.soldOut) 0.45f else 1f).clip(RoundedCornerShape(18.dp)).background(Color.White).border(1.dp, Border, RoundedCornerShape(18.dp)).clickable(onClick = onOpen).padding(12.dp),
+        Modifier
+            .fillMaxWidth()
+            .alpha(if (blocked) 0.45f else 1f)
+            .shadow(
+                6.dp,
+                SoftCardShape,
+                ambientColor = PrimaryGreen.copy(alpha = 0.05f),
+                spotColor = PrimaryGreen.copy(alpha = 0.08f),
+            )
+            .clip(SoftCardShape)
+            .background(Color.White)
+            .border(1.dp, Border, SoftCardShape)
+            .clickable(onClick = onOpen)
+            .padding(12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        ProductArt(product.imageUrl, tint, Modifier.size(68.dp), contentScale = ContentScale.Fit)
+        ProductArt(product.imageUrl, tint, Modifier.size(70.dp), contentScale = ContentScale.Fit)
         Column(Modifier.weight(1f).padding(horizontal = 12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Text(product.name, style = MaterialTheme.typography.titleMedium)
             if (product.description.isNotBlank()) {
                 Text(product.description, style = MaterialTheme.typography.bodySmall, maxLines = 2, color = Muted)
             }
-            Text(if (product.soldOut) stringResource(R.string.sold_out) else formatPrice(product.price), style = MaterialTheme.typography.bodyMedium, color = PrimaryGreen)
+            Text(
+                when {
+                    product.soldOut -> stringResource(R.string.sold_out)
+                    outsideHours -> stringResource(R.string.outside_service_hours)
+                    else -> formatPrice(product.price)
+                },
+                style = MaterialTheme.typography.bodyMedium,
+                color = PrimaryGreen,
+                fontWeight = FontWeight.Bold,
+            )
         }
         IconButton(
             onClick = onAdd,
-            enabled = !product.soldOut,
-            modifier = Modifier.size(44.dp).background(if (product.soldOut) Border else PrimaryGreen, RoundedCornerShape(14.dp)),
+            enabled = !blocked,
+            modifier = Modifier
+                .size(44.dp)
+                .clip(RoundedCornerShape(RadiusMd))
+                .background(if (blocked) Border else PrimaryGreen),
         ) {
             Icon(Icons.Outlined.Add, stringResource(R.string.add), tint = Color.White)
         }
@@ -482,10 +652,11 @@ fun ProductArt(
     contentScale: ContentScale = ContentScale.Fit,
     shape: Shape = RoundedCornerShape(14.dp),
 ) {
+    val resolved = resolveMediaUrl(url)
     Box(modifier.clip(shape).background(tint), contentAlignment = Alignment.Center) {
-        if (!url.isNullOrBlank()) {
+        if (!resolved.isNullOrBlank()) {
             AsyncImage(
-                model = url,
+                model = resolved,
                 contentDescription = stringResource(R.string.cd_product),
                 modifier = Modifier.fillMaxSize().padding(8.dp),
                 contentScale = contentScale,
@@ -585,8 +756,13 @@ fun ProductScreen(productId: String, onBack: () -> Unit, vm: ProductViewModel = 
                 Text(item.name, style = MaterialTheme.typography.headlineSmall, textAlign = TextAlign.Start)
             }
             ProductDetailSection(stringResource(R.string.product_price)) {
+                val outsideHours = item.isOutsideHoursBlocked()
                 Text(
-                    if (item.soldOut) stringResource(R.string.sold_out) else formatPrice(item.price),
+                    when {
+                        item.soldOut -> stringResource(R.string.sold_out)
+                        outsideHours -> stringResource(R.string.outside_service_hours)
+                        else -> formatPrice(item.price)
+                    },
                     style = MaterialTheme.typography.titleMedium,
                     color = PrimaryGreen,
                 )
@@ -699,7 +875,11 @@ fun ProductScreen(productId: String, onBack: () -> Unit, vm: ProductViewModel = 
                     color = if (qty < 20) Ink else Muted,
                 )
             }
-            Spacer(Modifier.width(12.dp))
+            Spacer(modifier = Modifier.width(12.dp))
+            val outsideHours = item.isOutsideHoursBlocked()
+            val blocked = item.isUnavailable()
+            val canAdd = !blocked &&
+                item.optionGroups.filter { it.required && it.type == "SINGLE" }.all { selected[it.id] != null }
             androidx.compose.material3.Button(
                 onClick = {
                     scope.launch {
@@ -707,7 +887,7 @@ fun ProductScreen(productId: String, onBack: () -> Unit, vm: ProductViewModel = 
                         onBack()
                     }
                 },
-                enabled = !item.soldOut && item.optionGroups.filter { it.required && it.type == "SINGLE" }.all { selected[it.id] != null },
+                enabled = canAdd,
                 modifier = Modifier.weight(1f).height(52.dp),
                 shape = RoundedCornerShape(16.dp),
                 contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 10.dp, vertical = 6.dp),
@@ -720,19 +900,25 @@ fun ProductScreen(productId: String, onBack: () -> Unit, vm: ProductViewModel = 
             ) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Text(
-                        stringResource(R.string.add_to_cart),
-                        color = Color.White,
+                        when {
+                            item.soldOut -> stringResource(R.string.sold_out)
+                            outsideHours -> stringResource(R.string.outside_service_hours)
+                            else -> stringResource(R.string.add_to_cart)
+                        },
+                        color = if (canAdd) Color.White else Muted,
                         style = MaterialTheme.typography.labelLarge,
                         maxLines = 1,
                         softWrap = false,
                     )
-                    Text(
-                        formatPrice(total),
-                        color = Color.White.copy(alpha = 0.92f),
-                        style = MaterialTheme.typography.bodySmall,
-                        maxLines = 1,
-                        softWrap = false,
-                    )
+                    if (!blocked) {
+                        Text(
+                            formatPrice(total),
+                            color = Color.White.copy(alpha = 0.92f),
+                            style = MaterialTheme.typography.bodySmall,
+                            maxLines = 1,
+                            softWrap = false,
+                        )
+                    }
                 }
             }
         }
