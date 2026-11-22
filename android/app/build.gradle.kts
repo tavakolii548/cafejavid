@@ -22,9 +22,9 @@ android {
         applicationId = "com.cafejavid"
         minSdk = 24
         targetSdk = 35
-        versionCode = 2
-        versionName = "1.1"
-        buildConfigField("String", "API_BASE", "\"http://2.188.205.123/\"")
+        versionCode = 3
+        versionName = "1.2"
+        buildConfigField("String", "API_BASE", "\"https://cafe-javid.ir/\"")
         buildConfigField("boolean", "DEMO_MODE", "false")
     }
 
