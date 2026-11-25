@@ -678,7 +678,55 @@ export function previewResponse(path: string, init?: RequestInit): unknown | nul
       return { ok: true };
     }
   }
-  if (path.includes('/admin/products')) return previewProducts;
+  if (path.includes('/admin/products')) {
+    if (method === 'GET') return previewProducts;
+    if (method === 'POST') {
+      const body = init?.body ? (JSON.parse(String(init.body)) as Partial<(typeof previewProducts)[number]>) : {};
+      const created = {
+        id: `p-${Date.now()}`,
+        categoryId: body.categoryId || previewCategories[0]?.id || 'c1',
+        name: (body.name || 'محصول جدید').trim(),
+        description: body.description || '',
+        price: Number(body.price || 0),
+        imageUrl: body.imageUrl ?? null,
+        featured: Boolean(body.featured),
+        combo: Boolean(body.combo),
+        soldOut: Boolean(body.soldOut),
+        hidden: Boolean(body.hidden),
+        sortOrder: Number(body.sortOrder || previewProducts.length),
+        serviceStartHour: body.serviceStartHour ?? null,
+        serviceEndHour: body.serviceEndHour ?? null,
+        optionGroups: body.optionGroups ?? [],
+      } as (typeof previewProducts)[number];
+      previewProducts.push(created);
+      return created;
+    }
+    if (method === 'PUT' || method === 'PATCH') {
+      const id = path.split('/admin/products/')[1]?.split(/[/?]/)[0] || '';
+      const idx = previewProducts.findIndex((p) => p.id === id);
+      if (idx < 0) throw new Error('محصول پیدا نشد');
+      const body = init?.body ? (JSON.parse(String(init.body)) as Partial<(typeof previewProducts)[number]>) : {};
+      if (path.includes('/availability')) {
+        previewProducts[idx] = { ...previewProducts[idx], soldOut: Boolean((body as { soldOut?: boolean }).soldOut) };
+        return previewProducts[idx];
+      }
+      previewProducts[idx] = { ...previewProducts[idx], ...body, id };
+      return previewProducts[idx];
+    }
+    if (method === 'DELETE') {
+      const id = path.split('/admin/products/')[1]?.split(/[/?]/)[0] || '';
+      const idx = previewProducts.findIndex((p) => p.id === id);
+      if (idx < 0) throw new Error('محصول پیدا نشد');
+      const used = previewOrders.some((o) => o.items.some((item) => item.productId === id));
+      if (used) {
+        previewProducts[idx] = { ...previewProducts[idx], hidden: true };
+        return { ok: true, hidden: true };
+      }
+      previewProducts.splice(idx, 1);
+      return { ok: true, hidden: false };
+    }
+    return previewProducts;
+  }
   if (path.includes('/admin/customers/') && path.includes('/summary') && method === 'GET') {
     const id = path.split('/admin/customers/')[1]?.split('/')[0] || '';
     const member = previewCustomers.find((c) => c.id === id);

@@ -1,4 +1,6 @@
-export const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+/** Empty in production = same-origin `/api` via nginx. Local dev defaults to Nest on :3000. */
+export const API_URL =
+  import.meta.env.VITE_API_URL || (import.meta.env.DEV ? 'http://localhost:3000' : '');
 
 export type Role = 'OWNER' | 'STAFF';
 
@@ -40,7 +42,7 @@ export interface Order {
   estimatedMinutes: number | null;
   createdAt: string;
   updatedAt: string;
-  user?: { id: string; phone: string; name: string | null };
+  user?: { id: string; phone: string; name: string | null; customerCode?: string | null };
   items: OrderItem[];
 }
 

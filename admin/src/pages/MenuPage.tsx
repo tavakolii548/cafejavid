@@ -196,6 +196,29 @@ export function MenuPage() {
     await refresh();
   }
 
+  async function removeProduct(product: Product) {
+    if (
+      !window.confirm(
+        `محصول «${product.name}» حذف شود؟\nاگر در سفارش قبلی استفاده شده باشد فقط از منو مخفی می‌شود.`,
+      )
+    ) {
+      return;
+    }
+    setError('');
+    try {
+      const result = await api<{ ok: boolean; hidden?: boolean }>(`/api/v1/admin/products/${product.id}`, {
+        method: 'DELETE',
+      });
+      if (editing?.id === product.id) setEditing(null);
+      await refresh();
+      if (result?.hidden) {
+        window.alert(`«${product.name}» چون در سفارش‌های قبلی بوده حذف کامل نشد و فقط از منو مخفی شد.`);
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'حذف محصول نشد');
+    }
+  }
+
   async function toggleHidden(product: Product) {
     await api(`/api/v1/admin/products/${product.id}`, {
       method: 'PUT',
@@ -422,6 +445,12 @@ export function MenuPage() {
                 >
                   ویرایش
                 </button>
+                <button
+                  className="h-11 rounded-btn border border-danger/30 bg-white px-3.5 text-sm font-bold text-danger transition hover:bg-danger/10"
+                  onClick={() => void removeProduct(product)}
+                >
+                  حذف
+                </button>
               </div>
             </article>
           ))
@@ -562,13 +591,22 @@ export function MenuPage() {
               </button>
             </div>
             {error ? <p className="mb-2 text-sm text-danger">{error}</p> : null}
-            <div className="flex gap-2">
-              <button className="h-12 flex-1 rounded-btn bg-primary font-bold text-white transition hover:brightness-110" type="submit">
+            <div className="flex flex-wrap gap-2">
+              <button className="h-12 min-w-[7rem] flex-1 rounded-btn bg-primary font-bold text-white transition hover:brightness-110" type="submit">
                 ذخیره
               </button>
-              <button className="h-12 flex-1 rounded-btn border border-line" type="button" onClick={() => setEditing(null)}>
+              <button className="h-12 min-w-[7rem] flex-1 rounded-btn border border-line" type="button" onClick={() => setEditing(null)}>
                 بستن
               </button>
+              {editing.id ? (
+                <button
+                  className="h-12 w-full rounded-btn border border-danger/30 text-sm font-bold text-danger transition hover:bg-danger/10"
+                  type="button"
+                  onClick={() => void removeProduct(editing as Product)}
+                >
+                  حذف محصول
+                </button>
+              ) : null}
             </div>
           </div>
         </form>

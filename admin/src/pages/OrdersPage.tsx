@@ -91,6 +91,7 @@ export function OrdersPage() {
   const [flash, setFlash] = useState<string | null>(null);
   const [openId, setOpenId] = useState<string | null>(null);
   const [printOrder, setPrintOrder] = useState<Order | null>(null);
+  const [printReprint, setPrintReprint] = useState(false);
   const [enRouteOpen, setEnRouteOpen] = useState(false);
   const [day, setDay] = useState(tehranToday);
   const [etaOrder, setEtaOrder] = useState<Order | null>(null);
@@ -140,6 +141,7 @@ export function OrdersPage() {
           setFlash(order.id);
           window.setTimeout(() => setFlash((id) => (id === order.id ? null : id)), 5000);
           if (localStorage.getItem('cafe-print') !== '0') {
+            setPrintReprint(false);
             setPrintOrder(order);
             window.setTimeout(() => window.print(), 200);
           }
@@ -310,6 +312,7 @@ export function OrdersPage() {
                     onToggle={() => setOpenId(openId === order.id ? null : order.id)}
                     onMove={(to) => requestMove(order, to)}
                     onPrint={() => {
+                      setPrintReprint(true);
                       setPrintOrder(order);
                       window.setTimeout(() => window.print(), 50);
                     }}
@@ -345,6 +348,7 @@ export function OrdersPage() {
                   onToggle={() => setOpenId(openId === order.id ? null : order.id)}
                   onMove={(to) => requestMove(order, to)}
                   onPrint={() => {
+                    setPrintReprint(true);
                     setPrintOrder(order);
                     window.setTimeout(() => window.print(), 50);
                   }}
@@ -399,7 +403,9 @@ export function OrdersPage() {
           </div>
         </div>
       ) : null}
-      {printOrder ? <Receipt order={printOrder} settings={settingsQuery.data ?? null} /> : null}
+      {printOrder ? (
+        <Receipt order={printOrder} settings={settingsQuery.data ?? null} reprint={printReprint} />
+      ) : null}
     </div>
   );
 }

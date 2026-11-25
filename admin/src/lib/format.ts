@@ -150,6 +150,26 @@ export function formatJalali(iso: string) {
   return toPersianDigits(`${j.jy}/${pad2(j.jm)}/${pad2(j.jd)} ${pad2(get('hour'))}:${pad2(get('minute'))}`);
 }
 
+/** Jalali date + time with seconds (receipt layout). */
+export function formatJalaliFull(iso: string) {
+  const date = new Date(iso);
+  const parts = new Intl.DateTimeFormat('en-GB', {
+    timeZone: 'Asia/Tehran',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hourCycle: 'h23',
+  }).formatToParts(date);
+  const get = (type: string) => Number(parts.find((part) => part.type === type)?.value);
+  const j = toJalaali(get('year'), get('month'), get('day'));
+  return toPersianDigits(
+    `${j.jy}/${pad2(j.jm)}/${pad2(j.jd)}  ${pad2(get('hour'))}:${pad2(get('minute'))}:${pad2(get('second'))}`,
+  );
+}
+
 /** Jalali date only (no time), Persian digits. */
 export function formatJalaliDate(iso: string) {
   const date = new Date(iso);

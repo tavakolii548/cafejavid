@@ -28,7 +28,12 @@ export function presentOrder(order: OrderWithRelations) {
     estimatedMinutes: order.estimatedMinutes,
     createdAt: order.createdAt.toISOString(),
     updatedAt: order.updatedAt.toISOString(),
-    user: { id: order.user.id, phone: order.user.phone, name: order.user.name },
+    user: {
+      id: order.user.id,
+      phone: order.user.phone,
+      name: order.user.name,
+      customerCode: order.user.customerCode ?? null,
+    },
     items: order.items.map((item) => ({
       id: item.id,
       productId: item.productId,
