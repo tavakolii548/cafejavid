@@ -35,8 +35,8 @@ function nextAction(order: Order) {
 
 const FULFILL: Record<string, string> = {
   DELIVERY: 'ارسال با پیک',
-  PICKUP: 'تحویل حضوری',
-  DINE_IN: 'داخل کافه',
+  PICKUP: 'ارسال با پیک',
+  DINE_IN: 'ارسال با پیک',
 };
 
 function beep() {
@@ -422,10 +422,7 @@ function OrderCard({
   onPrint: () => void;
 }) {
   const action = nextAction(order);
-  const badge =
-    order.fulfillment === 'DINE_IN'
-      ? `داخل کافه · میز ${toPersianDigits(order.tableNumber || '')}`
-      : FULFILL[order.fulfillment];
+  const badge = FULFILL[order.fulfillment] || 'ارسال با پیک';
   const style = timerStyle(level);
   return (
     <article

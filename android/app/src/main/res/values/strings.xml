@@ -71,6 +71,7 @@
     <string name="increase">زیاد کردن</string>
     <string name="cart_title">سبد خرید</string>
     <string name="delivery">ارسال با پیک</string>
+    <string name="delivery_only_hint">سفارش‌ها فقط با پیک ارسال می‌شوند</string>
     <string name="pickup">تحویل حضوری</string>
     <string name="dine_in">داخل کافه</string>
     <string name="pick_address">انتخاب آدرس روی نقشه</string>

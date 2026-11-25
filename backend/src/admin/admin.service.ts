@@ -139,7 +139,12 @@ export class AdminService {
     if (typeof body.phone === 'string') patch.phone = body.phone;
     if (typeof body.address === 'string') patch.address = body.address;
     if (typeof body.openingHours === 'string') patch.openingHours = body.openingHours;
+    if (typeof body.logoUrl === 'string') patch.logoUrl = body.logoUrl;
+    if (typeof body.receiptHeader === 'string') patch.receiptHeader = body.receiptHeader;
     if (typeof body.receiptFooter === 'string') patch.receiptFooter = body.receiptFooter;
+    if (typeof body.receiptShowPhone === 'boolean') patch.receiptShowPhone = body.receiptShowPhone;
+    if (typeof body.receiptShowAddress === 'boolean') patch.receiptShowAddress = body.receiptShowAddress;
+    if (typeof body.receiptShowHours === 'boolean') patch.receiptShowHours = body.receiptShowHours;
     if (typeof body.deliveryFee === 'number') patch.deliveryFee = body.deliveryFee;
     if (typeof body.packagingFee === 'number') patch.packagingFee = body.packagingFee;
     if (typeof body.minOrder === 'number') patch.minOrder = body.minOrder;

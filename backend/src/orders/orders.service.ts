@@ -53,32 +53,26 @@ export class OrdersService {
       throw new ApiException(HttpStatus.BAD_REQUEST, 'ONLINE_DISABLED', 'پرداخت آنلاین فعال نیست');
     }
 
-    let deliveryFee = 0;
-    let tableNumber: number | null = null;
+    if (dto.fulfillment !== Fulfillment.DELIVERY) {
+      throw new ApiException(HttpStatus.BAD_REQUEST, 'INVALID_FULFILLMENT', 'فقط ارسال با پیک فعال است');
+    }
+
+    const deliveryFee = cafe.deliveryFee;
+    const tableNumber: number | null = null;
     let addressSnapshot: Prisma.InputJsonValue | null = null;
-    if (dto.fulfillment === Fulfillment.DELIVERY) {
-      deliveryFee = cafe.deliveryFee;
-      if (dto.addressId) {
-        const addr = await this.prisma.address.findFirst({ where: { id: dto.addressId, userId } });
-        if (!addr) throw new ApiException(HttpStatus.BAD_REQUEST, 'ADDRESS_REQUIRED', 'آدرس را انتخاب کنید');
-        addressSnapshot = { title: addr.title, details: addr.details, lat: addr.lat, lng: addr.lng };
-      } else if (dto.address) {
-        addressSnapshot = {
-          title: dto.address.title,
-          details: dto.address.details,
-          lat: dto.address.lat,
-          lng: dto.address.lng,
-        };
-      } else {
-        throw new ApiException(HttpStatus.BAD_REQUEST, 'ADDRESS_REQUIRED', 'آدرس را انتخاب کنید');
-      }
-    } else if (dto.fulfillment === Fulfillment.DINE_IN) {
-      if (!dto.tableNumber || dto.tableNumber < 1 || dto.tableNumber > cafe.tableCount) {
-        throw new ApiException(HttpStatus.BAD_REQUEST, 'INVALID_TABLE', 'شماره میز معتبر نیست');
-      }
-      tableNumber = dto.tableNumber;
-    } else if (dto.fulfillment !== Fulfillment.PICKUP) {
-      throw new ApiException(HttpStatus.BAD_REQUEST, 'INVALID_FULFILLMENT', 'نوع تحویل معتبر نیست');
+    if (dto.addressId) {
+      const addr = await this.prisma.address.findFirst({ where: { id: dto.addressId, userId } });
+      if (!addr) throw new ApiException(HttpStatus.BAD_REQUEST, 'ADDRESS_REQUIRED', 'آدرس را انتخاب کنید');
+      addressSnapshot = { title: addr.title, details: addr.details, lat: addr.lat, lng: addr.lng };
+    } else if (dto.address) {
+      addressSnapshot = {
+        title: dto.address.title,
+        details: dto.address.details,
+        lat: dto.address.lat,
+        lng: dto.address.lng,
+      };
+    } else {
+      throw new ApiException(HttpStatus.BAD_REQUEST, 'ADDRESS_REQUIRED', 'آدرس را انتخاب کنید');
     }
 
     const created = await this.prisma.$transaction(async (tx) => {
@@ -147,7 +141,7 @@ export class OrdersService {
           number,
           userId,
           status: 'NEW',
-          fulfillment: dto.fulfillment,
+          fulfillment: Fulfillment.DELIVERY,
           tableNumber,
           addressSnapshot: addressSnapshot ?? undefined,
           customerNote: dto.note ?? null,

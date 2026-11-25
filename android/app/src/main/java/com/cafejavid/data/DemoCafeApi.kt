@@ -195,12 +195,11 @@ class DemoCafeApi : CafeApi {
         idempotency[key]?.let { id -> return order(id) }
         if (!config.acceptingOrders) throw DemoException("الان سفارش نمی‌گیریم")
         if (body.items.isEmpty()) throw DemoException("سبد خرید خالی است")
-        if (body.fulfillment == "DELIVERY" && body.addressId.isNullOrBlank() && body.address == null) {
-            throw DemoException("آدرس را انتخاب کنید")
+        if (body.fulfillment != "DELIVERY") {
+            throw DemoException("فقط ارسال با پیک فعال است")
         }
-        if (body.fulfillment == "DINE_IN") {
-            val table = body.tableNumber ?: 0
-            if (table < 1 || table > config.tableCount) throw DemoException("شماره میز معتبر نیست")
+        if (body.addressId.isNullOrBlank() && body.address == null) {
+            throw DemoException("آدرس را انتخاب کنید")
         }
         val catalog = products()
         val items = body.items.map { item ->
@@ -234,7 +233,7 @@ class DemoCafeApi : CafeApi {
         }
         val subtotal = items.sumOf { it.lineTotal }
         if (subtotal < config.minOrder) throw DemoException("مبلغ سفارش از حداقل کمتر است")
-        val delivery = if (body.fulfillment == "DELIVERY") config.deliveryFee else 0
+        val delivery = config.deliveryFee
         val packaging = if (items.isNotEmpty()) config.packagingFee else 0
         val discount = if (!body.discountCode.isNullOrBlank()) demoDiscount(body.discountCode, subtotal) else null
         val discountAmount = discount?.second ?: 0
@@ -242,8 +241,8 @@ class DemoCafeApi : CafeApi {
             id = "ord-${UUID.randomUUID()}",
             number = nextNumber++,
             status = "NEW",
-            fulfillment = body.fulfillment,
-            tableNumber = body.tableNumber,
+            fulfillment = "DELIVERY",
+            tableNumber = null,
             customerNote = body.note,
             subtotal = subtotal,
             deliveryFee = delivery,

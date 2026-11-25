@@ -285,15 +285,14 @@ private fun WelcomeDialog(
                                 .size(72.dp)
                                 .shadow(10.dp, CircleShape)
                                 .clip(CircleShape)
-                                .background(Color.White)
-                                .padding(10.dp),
+                                .background(Color.White),
                             contentAlignment = Alignment.Center,
                         ) {
                             Image(
                                 painter = painterResource(R.drawable.cafe_logo),
                                 contentDescription = stringResource(R.string.cd_logo),
                                 modifier = Modifier.fillMaxSize(),
-                                contentScale = ContentScale.Fit,
+                                contentScale = ContentScale.Crop,
                             )
                         }
                         Spacer(Modifier.height(12.dp))
@@ -588,7 +587,7 @@ private fun FeaturedCard(product: ProductDto, onClick: () -> Unit) {
                 Text(product.description, color = Color.White.copy(alpha = 0.82f), style = MaterialTheme.typography.bodySmall)
             }
         }
-        ProductArt(product.imageUrl, PrimaryTint, Modifier.size(76.dp))
+        ProductArt(product.imageUrl, PrimaryTint, Modifier.size(76.dp), contentScale = ContentScale.Crop)
     }
 }
 
@@ -614,7 +613,7 @@ private fun ProductRow(product: ProductDto, index: Int, onOpen: () -> Unit, onAd
             .padding(12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        ProductArt(product.imageUrl, tint, Modifier.size(70.dp), contentScale = ContentScale.Fit)
+        ProductArt(product.imageUrl, tint, Modifier.size(70.dp), contentScale = ContentScale.Crop)
         Column(Modifier.weight(1f).padding(horizontal = 12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Text(product.name, style = MaterialTheme.typography.titleMedium)
             if (product.description.isNotBlank()) {
@@ -649,7 +648,7 @@ fun ProductArt(
     url: String?,
     tint: Color,
     modifier: Modifier,
-    contentScale: ContentScale = ContentScale.Fit,
+    contentScale: ContentScale = ContentScale.Crop,
     shape: Shape = RoundedCornerShape(14.dp),
 ) {
     val resolved = resolveMediaUrl(url)
@@ -658,7 +657,7 @@ fun ProductArt(
             AsyncImage(
                 model = resolved,
                 contentDescription = stringResource(R.string.cd_product),
-                modifier = Modifier.fillMaxSize().padding(8.dp),
+                modifier = Modifier.fillMaxSize(),
                 contentScale = contentScale,
             )
         } else {
@@ -749,7 +748,7 @@ fun ProductScreen(productId: String, onBack: () -> Unit, vm: ProductViewModel = 
                     .fillMaxWidth()
                     .height(240.dp)
                     .border(1.dp, Border, RoundedCornerShape(24.dp)),
-                contentScale = ContentScale.Fit,
+                contentScale = ContentScale.Crop,
                 shape = RoundedCornerShape(24.dp),
             )
             ProductDetailSection(stringResource(R.string.name)) {

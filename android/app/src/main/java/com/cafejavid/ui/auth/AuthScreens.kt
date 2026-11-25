@@ -273,15 +273,14 @@ fun LoginScreen(onSuccess: (Boolean) -> Unit, vm: LoginViewModel = hiltViewModel
                         .size(100.dp)
                         .shadow(12.dp, CircleShape, ambientColor = Color.Black.copy(alpha = 0.18f))
                         .clip(CircleShape)
-                        .background(Color.White.copy(alpha = 0.14f))
-                        .padding(14.dp),
+                        .background(Color.White.copy(alpha = 0.14f)),
                     contentAlignment = Alignment.Center,
                 ) {
                     Image(
                         painter = painterResource(R.drawable.cafe_logo),
                         contentDescription = stringResource(R.string.cd_logo),
                         modifier = Modifier.fillMaxSize(),
-                        contentScale = ContentScale.Fit,
+                        contentScale = ContentScale.Crop,
                     )
                 }
                 Spacer(Modifier.height(12.dp))

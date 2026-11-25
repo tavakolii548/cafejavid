@@ -203,7 +203,27 @@ export class SettingsDto {
 
   @IsOptional()
   @IsString()
+  logoUrl?: string;
+
+  @IsOptional()
+  @IsString()
+  receiptHeader?: string;
+
+  @IsOptional()
+  @IsString()
   receiptFooter?: string;
+
+  @IsOptional()
+  @IsBoolean()
+  receiptShowPhone?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  receiptShowAddress?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  receiptShowHours?: boolean;
 
   @IsOptional()
   @Type(() => Number)

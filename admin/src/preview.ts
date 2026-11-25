@@ -82,7 +82,7 @@ export const previewOrders: Order[] = [
     id: 'o2',
     number: 1249,
     status: 'PREPARING',
-    fulfillment: 'PICKUP',
+    fulfillment: 'DELIVERY',
     tableNumber: null,
     addressSnapshot: null,
     customerNote: 'کم‌شیر باشد',
@@ -231,12 +231,17 @@ export const previewSettings: Settings = {
   phone: '02133656911',
   address: 'بلوار ده‌حقی، نرسیده به بلوار نبرد',
   openingHours: '۸ تا ۲۳',
+  logoUrl: '/cafe-logo.png',
   deliveryFee: 0,
   packagingFee: 55000,
   minOrder: 0,
   tableCount: 10,
   acceptingOrders: true,
+  receiptHeader: 'سفارش شما با عشق آماده می‌شود',
   receiptFooter: 'نوش جان',
+  receiptShowPhone: true,
+  receiptShowAddress: true,
+  receiptShowHours: false,
 };
 
 function toLatinDigits(value: string) {

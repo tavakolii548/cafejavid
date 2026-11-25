@@ -62,9 +62,9 @@ const STATUS_LABEL: Record<string, string> = {
 };
 
 const FULFILLMENT_LABEL: Record<string, string> = {
-  DELIVERY: 'ارسال',
-  PICKUP: 'حضوری',
-  DINE_IN: 'داخل سالن',
+  DELIVERY: 'ارسال با پیک',
+  PICKUP: 'ارسال با پیک',
+  DINE_IN: 'ارسال با پیک',
 };
 
 function shift(days: number) {

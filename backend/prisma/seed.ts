@@ -13,12 +13,17 @@ const SETTINGS: Record<string, unknown> = {
   phone: '02133656911',
   address: 'بلوار ده‌حقی، نرسیده به بلوار نبرد، کافه جاوید',
   openingHours: '۸ تا ۲۳',
+  logoUrl: '',
   deliveryFee: 0,
   packagingFee: 55000,
   minOrder: 0,
   tableCount: 10,
   acceptingOrders: true,
+  receiptHeader: 'سفارش شما با عشق آماده می‌شود',
   receiptFooter: 'نوش جان — منتظر سفارش بعدی‌تون هستیم',
+  receiptShowPhone: true,
+  receiptShowAddress: true,
+  receiptShowHours: false,
 };
 
 const MENU_CATEGORIES = [

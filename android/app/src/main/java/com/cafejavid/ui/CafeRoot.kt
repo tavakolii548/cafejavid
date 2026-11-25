@@ -1,5 +1,8 @@
 package com.cafejavid.ui
 
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
@@ -47,6 +50,9 @@ import com.cafejavid.ui.theme.PrimaryGreen
 import com.cafejavid.ui.theme.PrimaryTint
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
+
+private val SoftFadeIn = fadeIn(animationSpec = tween(220))
+private val SoftFadeOut = fadeOut(animationSpec = tween(180))
 
 object Routes {
     const val Login = "login"
@@ -99,7 +105,15 @@ fun CafeRoot(openNotifications: Boolean = false, vm: RootViewModel = hiltViewMod
             }
         },
     ) { padding ->
-        NavHost(nav, startDestination = start, modifier = Modifier.padding(padding)) {
+        NavHost(
+            navController = nav,
+            startDestination = start,
+            modifier = Modifier.padding(padding),
+            enterTransition = { SoftFadeIn },
+            exitTransition = { SoftFadeOut },
+            popEnterTransition = { SoftFadeIn },
+            popExitTransition = { SoftFadeOut },
+        ) {
             composable(Routes.Login) {
                 LoginScreen(
                     onSuccess = { toCart ->

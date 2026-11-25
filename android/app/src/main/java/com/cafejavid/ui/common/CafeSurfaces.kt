@@ -144,12 +144,12 @@ fun Modifier.cafeScreenEnter(delayMillis: Int = 0): Modifier {
     }
     val alpha by animateFloatAsState(
         targetValue = if (visible) 1f else 0f,
-        animationSpec = tween(380, delayMillis = delayMillis, easing = FastOutSlowInEasing),
+        animationSpec = tween(240, delayMillis = delayMillis, easing = FastOutSlowInEasing),
         label = "screenEnterAlpha",
     )
     val offset by animateFloatAsState(
-        targetValue = if (visible) 0f else 22f,
-        animationSpec = tween(420, delayMillis = delayMillis, easing = FastOutSlowInEasing),
+        targetValue = if (visible) 0f else 8f,
+        animationSpec = tween(260, delayMillis = delayMillis, easing = FastOutSlowInEasing),
         label = "screenEnterOffset",
     )
     return this.graphicsLayer {

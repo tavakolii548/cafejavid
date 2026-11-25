@@ -88,12 +88,17 @@ export interface Settings {
   phone: string;
   address: string;
   openingHours: string;
+  logoUrl?: string;
   deliveryFee: number;
   packagingFee: number;
   minOrder: number;
   tableCount: number;
   acceptingOrders: boolean;
+  receiptHeader?: string;
   receiptFooter: string;
+  receiptShowPhone?: boolean;
+  receiptShowAddress?: boolean;
+  receiptShowHours?: boolean;
 }
 
 const KEY = 'cafe-staff-session';
