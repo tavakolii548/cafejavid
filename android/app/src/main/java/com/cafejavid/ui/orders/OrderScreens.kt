@@ -601,21 +601,28 @@ fun TrackingScreen(orderId: String, onMenu: () -> Unit, vm: TrackingViewModel = 
                 }
             }
         }
-        Row(
+        Column(
             Modifier
                 .fillMaxWidth()
                 .background(Color.White)
                 .border(1.dp, Border)
                 .padding(20.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            CafeOutlinedButton(stringResource(R.string.call_cafe), {
-                val phone = config.phone
-                if (phone.isNotBlank()) {
-                    context.startActivity(Intent(Intent.ACTION_DIAL, Uri.parse("tel:$phone")))
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                CafeOutlinedButton(stringResource(R.string.call_cafe), {
+                    val phone = config.phone
+                    if (phone.isNotBlank()) {
+                        context.startActivity(Intent(Intent.ACTION_DIAL, Uri.parse("tel:$phone")))
+                    }
+                }, Modifier.weight(1f).height(54.dp))
+                if (config.courierPhone.isNotBlank()) {
+                    CafeOutlinedButton(stringResource(R.string.call_courier), {
+                        context.startActivity(Intent(Intent.ACTION_DIAL, Uri.parse("tel:${config.courierPhone}")))
+                    }, Modifier.weight(1f).height(54.dp))
                 }
-            }, Modifier.weight(1f).height(54.dp))
-            CafeButton(stringResource(R.string.back_to_menu), onMenu, Modifier.weight(1f).height(54.dp))
+            }
+            CafeButton(stringResource(R.string.back_to_menu), onMenu, Modifier.fillMaxWidth().height(54.dp))
         }
     }
 }

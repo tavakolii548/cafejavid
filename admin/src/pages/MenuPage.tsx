@@ -160,6 +160,7 @@ export function MenuPage() {
       price: Number(editing.price || 0),
       imageUrl: editing.imageUrl || undefined,
       featured: Boolean(editing.featured),
+      combo: Boolean(editing.combo),
       soldOut: Boolean(editing.soldOut),
       hidden: Boolean(editing.hidden),
       sortOrder: Number(editing.sortOrder || 0),
@@ -205,6 +206,7 @@ export function MenuPage() {
         price: product.price,
         imageUrl: product.imageUrl,
         featured: product.featured,
+        combo: Boolean(product.combo),
         soldOut: product.soldOut,
         hidden: !product.hidden,
         sortOrder: product.sortOrder,
@@ -236,6 +238,7 @@ export function MenuPage() {
               description: '',
               price: 0,
               featured: false,
+              combo: false,
               soldOut: false,
               hidden: false,
               serviceStartHour: null,
@@ -364,6 +367,9 @@ export function MenuPage() {
                     {product.featured ? (
                       <span className="rounded-full bg-accent/80 px-2 py-0.5 text-[11px] font-bold text-ink">پیشنهاد</span>
                     ) : null}
+                    {product.combo ? (
+                      <span className="rounded-full bg-primary/15 px-2 py-0.5 text-[11px] font-bold text-primary">کمبو</span>
+                    ) : null}
                     {product.soldOut ? (
                       <span className="rounded-full bg-sand px-2 py-0.5 text-[11px] font-medium">تمام شد</span>
                     ) : null}
@@ -462,9 +468,13 @@ export function MenuPage() {
                 placeholder="قیمت تومان"
               />
             </div>
-            <label className="mb-3 flex items-center gap-2 rounded-2xl bg-tint/50 px-3 py-2.5 text-sm">
+            <label className="mb-2 flex items-center gap-2 rounded-2xl bg-tint/50 px-3 py-2.5 text-sm">
               <input type="checkbox" checked={Boolean(editing.featured)} onChange={(e) => setEditing({ ...editing, featured: e.target.checked })} />
               پیشنهاد امروز
+            </label>
+            <label className="mb-3 flex items-center gap-2 rounded-2xl bg-tint/50 px-3 py-2.5 text-sm">
+              <input type="checkbox" checked={Boolean(editing.combo)} onChange={(e) => setEditing({ ...editing, combo: e.target.checked })} />
+              نمایش در بخش کمبو
             </label>
             <div className="mb-3 rounded-2xl border border-line/80 bg-tint/25 p-3">
               <p className="mb-2 text-xs font-medium text-primary/90">محدودیت ساعت سفارش (تهران)</p>

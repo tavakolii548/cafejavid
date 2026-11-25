@@ -58,7 +58,11 @@ export function LoginPage() {
         className="relative w-full max-w-md rounded-[24px] border border-white/80 bg-white/92 p-8 shadow-[0_24px_60px_rgba(23,37,30,0.12)] backdrop-blur"
       >
         <div className="mb-6 text-center">
-          <div className="mx-auto mb-3 grid h-12 w-12 place-items-center rounded-2xl bg-primary text-lg font-bold text-accent">ج</div>
+          <img
+            src="/cafe-logo.png"
+            alt=""
+            className="mx-auto mb-3 h-14 w-14 rounded-2xl object-cover shadow-[0_8px_18px_rgba(30,77,58,0.18)]"
+          />
           <h1 className="text-[1.45rem] font-bold text-ink">کافه جاوید</h1>
           <p className="mt-1 text-sm text-muted">ورود کارکنان</p>
         </div>

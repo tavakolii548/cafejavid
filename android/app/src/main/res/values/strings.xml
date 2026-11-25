@@ -53,6 +53,10 @@
     <string name="all">همه</string>
     <string name="featured_badge">پیشنهاد امروز</string>
     <string name="bestsellers">پرفروش‌ها</string>
+    <string name="combos">کمبو</string>
+    <string name="clear_notifications">پاک کردن اعلان‌ها</string>
+    <string name="call_courier">تماس با پیک</string>
+    <string name="notif_permission_hint">برای دیدن اعلان روی گوشی، اجازه اعلان‌ها را در تنظیمات روشن کنید.</string>
     <string name="sold_out">تموم شد</string>
     <string name="outside_service_hours">خارج از زمان سرویس‌دهی</string>
     <string name="add">افزودن</string>

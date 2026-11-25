@@ -67,6 +67,7 @@ export interface Product {
   price: number;
   imageUrl?: string | null;
   featured: boolean;
+  combo?: boolean;
   soldOut: boolean;
   hidden: boolean;
   sortOrder: number;
@@ -86,6 +87,7 @@ export interface Category {
 export interface Settings {
   cafeName: string;
   phone: string;
+  courierPhone?: string;
   address: string;
   openingHours: string;
   logoUrl?: string;

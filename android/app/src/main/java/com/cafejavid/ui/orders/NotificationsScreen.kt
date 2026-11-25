@@ -2,6 +2,7 @@ package com.cafejavid.ui.orders
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -27,13 +28,18 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import android.Manifest
+import android.content.pm.PackageManager
+import android.os.Build
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import androidx.core.content.ContextCompat
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
@@ -90,6 +96,16 @@ class NotificationsViewModel @Inject constructor(
             }
         }
     }
+
+    fun clearAll() {
+        viewModelScope.launch {
+            store.clearAll()
+            val token = session.session.first().accessToken
+            if (!token.isNullOrBlank()) {
+                runCatching { api.markNotificationsRead() }
+            }
+        }
+    }
 }
 
 @Composable
@@ -106,6 +122,10 @@ fun NotificationsScreen(onBack: () -> Unit, vm: NotificationsViewModel = hiltVie
     }
     val cafeItems = items.filter { it.source == "server" }
     val appItems = items.filter { it.source != "server" }
+    val context = LocalContext.current
+    val notifAllowed = Build.VERSION.SDK_INT < 33 ||
+        ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) ==
+        PackageManager.PERMISSION_GRANTED
     Column(Modifier.fillMaxSize().background(Background)) {
         Row(
             Modifier
@@ -117,7 +137,36 @@ fun NotificationsScreen(onBack: () -> Unit, vm: NotificationsViewModel = hiltVie
             IconButton(onClick = onBack, modifier = Modifier.size(44.dp)) {
                 Icon(Icons.AutoMirrored.Outlined.ArrowBack, stringResource(R.string.back), tint = Ink)
             }
-            Text(stringResource(R.string.notifications), style = MaterialTheme.typography.headlineSmall)
+            Text(
+                stringResource(R.string.notifications),
+                style = MaterialTheme.typography.headlineSmall,
+                modifier = Modifier.weight(1f),
+            )
+            if (items.isNotEmpty()) {
+                Text(
+                    stringResource(R.string.clear_notifications),
+                    color = PrimaryGreen,
+                    style = MaterialTheme.typography.labelLarge,
+                    modifier = Modifier
+                        .clip(SoftCardShape)
+                        .clickable { vm.clearAll() }
+                        .padding(horizontal = 10.dp, vertical = 8.dp),
+                )
+            }
+        }
+        if (!notifAllowed) {
+            Text(
+                stringResource(R.string.notif_permission_hint),
+                color = Muted,
+                style = MaterialTheme.typography.bodySmall,
+                modifier = Modifier
+                    .padding(horizontal = 20.dp)
+                    .fillMaxWidth()
+                    .clip(SoftCardShape)
+                    .background(PrimaryTint.copy(alpha = 0.45f))
+                    .padding(12.dp),
+            )
+            Spacer(Modifier.height(8.dp))
         }
         if (items.isEmpty()) {
             CafeEmptyState(

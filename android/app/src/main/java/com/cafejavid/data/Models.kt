@@ -7,6 +7,7 @@ import kotlinx.serialization.json.JsonElement
 data class CafeConfig(
     val cafeName: String = "",
     val phone: String = "",
+    val courierPhone: String = "",
     val address: String = "",
     val openingHours: String = "",
     val acceptingOrders: Boolean = true,
@@ -113,6 +114,7 @@ data class ProductDto(
     val price: Int,
     val imageUrl: String? = null,
     val featured: Boolean = false,
+    val combo: Boolean = false,
     val soldOut: Boolean = false,
     val serviceStartHour: Int? = null,
     val serviceEndHour: Int? = null,

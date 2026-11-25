@@ -16,6 +16,7 @@ export function SettingsPage() {
       setForm({
         ...settings.data,
         logoUrl: settings.data.logoUrl || '',
+        courierPhone: settings.data.courierPhone || '',
         receiptHeader: settings.data.receiptHeader || '',
         receiptShowPhone: settings.data.receiptShowPhone !== false,
         receiptShowAddress: settings.data.receiptShowAddress !== false,
@@ -81,7 +82,12 @@ export function SettingsPage() {
       <form onSubmit={save} className="order-card max-w-xl !p-5">
         <h2 className="mb-3 text-sm font-bold text-primary/90">اطلاعات کافه</h2>
         <Field label="نام کافه" value={form.cafeName} onChange={(value) => setForm({ ...form, cafeName: value })} />
-        <Field label="تلفن" value={form.phone} onChange={(value) => setForm({ ...form, phone: value })} />
+        <Field label="تلفن کافه" value={form.phone} onChange={(value) => setForm({ ...form, phone: value })} />
+        <Field
+          label="تلفن پیک"
+          value={form.courierPhone || ''}
+          onChange={(value) => setForm({ ...form, courierPhone: value })}
+        />
         <Field label="آدرس" value={form.address} onChange={(value) => setForm({ ...form, address: value })} />
         <Field label="ساعات کاری" value={form.openingHours} onChange={(value) => setForm({ ...form, openingHours: value })} />
 

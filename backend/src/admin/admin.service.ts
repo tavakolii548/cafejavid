@@ -4,6 +4,7 @@ import { ApiException } from '../common/api.exception';
 import { ensureCustomerCode, nextCustomerCode } from '../common/customer-code';
 import { normalizePhone } from '../common/phone';
 import { SettingsService, CafeSettings } from '../cafe/settings.service';
+import { toRelativeUploadPath } from '../common/media-url';
 import { PrismaService } from '../prisma/prisma.service';
 import { CategoryDto, ClubMemberDto, ProductWriteDto, UpdateClubMemberDto } from './dto';
 
@@ -72,8 +73,9 @@ export class AdminService {
         name: dto.name,
         description: dto.description,
         price: dto.price,
-        imageUrl: dto.imageUrl,
+        imageUrl: toRelativeUploadPath(dto.imageUrl) ?? dto.imageUrl,
         featured: dto.featured ?? false,
+        combo: dto.combo ?? false,
         soldOut: dto.soldOut ?? false,
         hidden: dto.hidden ?? false,
         sortOrder: dto.sortOrder ?? 0,
@@ -100,8 +102,9 @@ export class AdminService {
           name: dto.name,
           description: dto.description,
           price: dto.price,
-          imageUrl: dto.imageUrl,
+          imageUrl: toRelativeUploadPath(dto.imageUrl) ?? dto.imageUrl,
           featured: dto.featured,
+          combo: dto.combo,
           soldOut: dto.soldOut,
           hidden: dto.hidden,
           sortOrder: dto.sortOrder,
@@ -137,6 +140,7 @@ export class AdminService {
     const patch: Partial<CafeSettings> = {};
     if (typeof body.cafeName === 'string') patch.cafeName = body.cafeName;
     if (typeof body.phone === 'string') patch.phone = body.phone;
+    if (typeof body.courierPhone === 'string') patch.courierPhone = body.courierPhone;
     if (typeof body.address === 'string') patch.address = body.address;
     if (typeof body.openingHours === 'string') patch.openingHours = body.openingHours;
     if (typeof body.logoUrl === 'string') patch.logoUrl = body.logoUrl;

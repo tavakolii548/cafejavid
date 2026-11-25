@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
+import { useEffect, useState } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
-import { loadSession, saveSession } from '../api';
+import { API_URL, api, loadSession, saveSession, type Settings } from '../api';
 
 const links = [
   { to: '/', label: 'سفارش‌ها', owner: false },
@@ -13,10 +14,32 @@ const links = [
   { to: '/settings', label: 'تنظیمات', owner: true },
 ];
 
+function resolveLogo(url?: string | null) {
+  const trimmed = url?.trim();
+  if (!trimmed) return '/cafe-logo.png';
+  if (/^https?:\/\//i.test(trimmed) || trimmed.startsWith('data:') || trimmed.startsWith('/')) return trimmed;
+  return `${API_URL.replace(/\/+$/, '')}/${trimmed.replace(/^\/+/, '')}`;
+}
+
 export function Shell({ children }: { children: ReactNode }) {
   const session = loadSession();
   const navigate = useNavigate();
   const visible = links.filter((link) => !link.owner || session?.role === 'OWNER');
+  const [brand, setBrand] = useState<{ name: string; logo: string }>({
+    name: 'کافه جاوید',
+    logo: '/cafe-logo.png',
+  });
+
+  useEffect(() => {
+    void api<Settings>('/api/v1/admin/settings')
+      .then((settings) => {
+        setBrand({
+          name: settings.cafeName?.trim() || 'کافه جاوید',
+          logo: resolveLogo(settings.logoUrl),
+        });
+      })
+      .catch(() => undefined);
+  }, []);
 
   return (
     <div className="flex min-h-screen">
@@ -30,18 +53,19 @@ export function Shell({ children }: { children: ReactNode }) {
         <div
           className="pointer-events-none absolute inset-0 opacity-[0.07]"
           style={{
-            backgroundImage:
-              'radial-gradient(circle at 1px 1px, #fff 1px, transparent 0)',
+            backgroundImage: 'radial-gradient(circle at 1px 1px, #fff 1px, transparent 0)',
             backgroundSize: '14px 14px',
           }}
           aria-hidden
         />
 
         <div className="relative mb-8 px-2">
-          <div className="mb-3 grid h-11 w-11 place-items-center rounded-2xl bg-accent text-lg font-bold text-ink shadow-[0_8px_18px_rgba(0,0,0,0.18)]">
-            ج
-          </div>
-          <div className="text-[1.05rem] font-bold leading-tight">کافه جاوید</div>
+          <img
+            src={brand.logo}
+            alt=""
+            className="mb-3 h-11 w-11 rounded-2xl object-cover shadow-[0_8px_18px_rgba(0,0,0,0.18)]"
+          />
+          <div className="text-[1.05rem] font-bold leading-tight">{brand.name}</div>
           <div className="mt-1 text-[11px] text-white/65">پنل مدیریت</div>
         </div>
 

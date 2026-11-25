@@ -16,6 +16,7 @@ export class ConfigController {
     return {
       cafeName: s.cafeName,
       phone: s.phone,
+      courierPhone: s.courierPhone,
       address: s.address,
       openingHours: s.openingHours,
       logoUrl: absolutizeMediaUrl(s.logoUrl, mediaBase) || s.logoUrl || '',

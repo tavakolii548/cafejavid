@@ -51,6 +51,7 @@ function presentProduct(
     price: number;
     imageUrl: string | null;
     featured: boolean;
+    combo: boolean;
     soldOut: boolean;
     sortOrder: number;
     serviceStartHour: number | null;
@@ -75,6 +76,7 @@ function presentProduct(
     price: product.price,
     imageUrl: absolutizeMediaUrl(product.imageUrl, mediaBase),
     featured: product.featured,
+    combo: product.combo,
     soldOut: product.soldOut,
     sortOrder: product.sortOrder,
     serviceStartHour: product.serviceStartHour,

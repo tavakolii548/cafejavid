@@ -19,13 +19,32 @@ export function publicBaseUrl(req?: Request): string {
   return `${proto}://${host}`;
 }
 
-/** Absolute URL for stored media; leaves http(s) and empty values alone. */
+/** Prefer storing `/uploads/...` so clients can resolve against the live API host. */
+export function toRelativeUploadPath(url: string | null | undefined): string | null {
+  if (url == null) return null;
+  const trimmed = url.trim();
+  if (!trimmed) return null;
+  const match = trimmed.match(/\/uploads\/[^?#]+/i);
+  if (match) return match[0];
+  if (trimmed.startsWith('/')) return trimmed;
+  return trimmed;
+}
+
+/** Absolute URL for stored media; rewrites `/uploads` paths onto the public base. */
 export function absolutizeMediaUrl(url: string | null | undefined, base: string): string | null {
   if (url == null) return null;
   const trimmed = url.trim();
   if (!trimmed) return null;
-  if (/^https?:\/\//i.test(trimmed) || trimmed.startsWith('data:')) return trimmed;
-  if (!base) return trimmed;
+  if (trimmed.startsWith('data:')) return trimmed;
+
+  const uploadsPath = trimmed.match(/\/uploads\/[^?#]+/i)?.[0];
+  if (uploadsPath) {
+    if (!base) return uploadsPath;
+    return `${base.replace(/\/+$/, '')}${uploadsPath}`;
+  }
+
+  if (/^https?:\/\//i.test(trimmed)) return trimmed;
+  if (!base) return trimmed.startsWith('/') ? trimmed : `/${trimmed}`;
   const path = trimmed.startsWith('/') ? trimmed : `/${trimmed}`;
   return `${base.replace(/\/+$/, '')}${path}`;
 }

@@ -11,6 +11,7 @@ function faDigits(input: string): string {
 const SETTINGS: Record<string, unknown> = {
   cafeName: 'کافه جاوید',
   phone: '02133656911',
+  courierPhone: '',
   address: 'بلوار ده‌حقی، نرسیده به بلوار نبرد، کافه جاوید',
   openingHours: '۸ تا ۲۳',
   logoUrl: '',

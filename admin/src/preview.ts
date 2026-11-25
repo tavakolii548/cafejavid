@@ -30,6 +30,7 @@ function p(
   extras?: {
     imageFile?: string;
     featured?: boolean;
+    combo?: boolean;
     soldOut?: boolean;
     hidden?: boolean;
     serviceStartHour?: number | null;
@@ -44,6 +45,7 @@ function p(
     price,
     imageUrl: extras?.imageFile ? img(extras.imageFile) : null,
     featured: extras?.featured ?? false,
+    combo: extras?.combo ?? false,
     soldOut: extras?.soldOut ?? false,
     hidden: extras?.hidden ?? false,
     sortOrder,
@@ -229,6 +231,7 @@ export const previewProducts: Product[] = [
 export const previewSettings: Settings = {
   cafeName: 'کافه جاوید',
   phone: '02133656911',
+  courierPhone: '09120000000',
   address: 'بلوار ده‌حقی، نرسیده به بلوار نبرد',
   openingHours: '۸ تا ۲۳',
   logoUrl: '/cafe-logo.png',

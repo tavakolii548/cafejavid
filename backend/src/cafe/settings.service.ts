@@ -5,6 +5,7 @@ import { PrismaService } from '../prisma/prisma.service';
 export interface CafeSettings {
   cafeName: string;
   phone: string;
+  courierPhone: string;
   address: string;
   openingHours: string;
   logoUrl: string;
@@ -23,6 +24,7 @@ export interface CafeSettings {
 const DEFAULTS: CafeSettings = {
   cafeName: 'کافه جاوید',
   phone: '',
+  courierPhone: '',
   address: '',
   openingHours: '',
   logoUrl: '',
@@ -56,6 +58,7 @@ export class SettingsService {
     merged.tableCount = Number(merged.tableCount) || 0;
     merged.acceptingOrders = Boolean(merged.acceptingOrders);
     merged.logoUrl = typeof merged.logoUrl === 'string' ? merged.logoUrl : '';
+    merged.courierPhone = typeof merged.courierPhone === 'string' ? merged.courierPhone : '';
     merged.receiptHeader = typeof merged.receiptHeader === 'string' ? merged.receiptHeader : '';
     merged.receiptShowPhone = merged.receiptShowPhone !== false;
     merged.receiptShowAddress = merged.receiptShowAddress !== false;

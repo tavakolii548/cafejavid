@@ -8,13 +8,16 @@ import com.cafejavid.BuildConfig
  */
 fun resolveMediaUrl(url: String?): String? {
     val trimmed = url?.trim()?.takeIf { it.isNotEmpty() } ?: return null
+    if (trimmed.startsWith("data:", ignoreCase = true)) return trimmed
+    val base = BuildConfig.API_BASE.trimEnd('/')
+    // Rewrite any host's /uploads/... onto the live API origin (fixes localhost URLs in DB).
+    val uploads = Regex("""/uploads/[^?#]+""", RegexOption.IGNORE_CASE).find(trimmed)?.value
+    if (uploads != null) return "$base$uploads"
     if (trimmed.startsWith("http://", ignoreCase = true) ||
-        trimmed.startsWith("https://", ignoreCase = true) ||
-        trimmed.startsWith("data:", ignoreCase = true)
+        trimmed.startsWith("https://", ignoreCase = true)
     ) {
         return trimmed
     }
-    val base = BuildConfig.API_BASE.trimEnd('/')
     val path = if (trimmed.startsWith('/')) trimmed else "/$trimmed"
     return "$base$path"
 }

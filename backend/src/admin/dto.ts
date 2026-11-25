@@ -91,6 +91,10 @@ export class ProductWriteDto {
 
   @IsOptional()
   @IsBoolean()
+  combo?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
   soldOut?: boolean;
 
   @IsOptional()
@@ -192,6 +196,10 @@ export class SettingsDto {
   @IsOptional()
   @IsString()
   phone?: string;
+
+  @IsOptional()
+  @IsString()
+  courierPhone?: string;
 
   @IsOptional()
   @IsString()

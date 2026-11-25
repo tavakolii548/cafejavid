@@ -16,8 +16,11 @@ import com.cafejavid.data.NotificationStore
 import com.cafejavid.data.SessionStore
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import java.util.concurrent.TimeUnit
 import javax.inject.Inject
@@ -64,14 +67,29 @@ class NotificationForegroundSync @Inject constructor(
 ) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private var started = false
+    private var pollJob: Job? = null
 
     fun start() {
         if (started) return
         started = true
         ProcessLifecycleOwner.get().lifecycle.addObserver(
             LifecycleEventObserver { _, event ->
-                if (event == Lifecycle.Event.ON_START) {
-                    scope.launch { syncQuietly() }
+                when (event) {
+                    Lifecycle.Event.ON_START -> {
+                        scope.launch { syncQuietly() }
+                        pollJob?.cancel()
+                        pollJob = scope.launch {
+                            while (isActive) {
+                                delay(45_000)
+                                syncQuietly()
+                            }
+                        }
+                    }
+                    Lifecycle.Event.ON_STOP -> {
+                        pollJob?.cancel()
+                        pollJob = null
+                    }
+                    else -> Unit
                 }
             },
         )

@@ -281,6 +281,12 @@ class NotificationStore @Inject constructor(
         }
     }
 
+    suspend fun clearAll() {
+        store.edit { prefs ->
+            prefs[itemsKey] = json.encodeToString(emptyList<AppNotification>())
+        }
+    }
+
     suspend fun mergeServer(items: List<ServerNotificationDto>) {
         if (items.isEmpty()) return
         val newlyUnread = mutableListOf<AppNotification>()

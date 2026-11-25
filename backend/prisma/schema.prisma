@@ -156,6 +156,7 @@ model Product {
   price            Int
   imageUrl         String?
   featured         Boolean             @default(false)
+  combo            Boolean             @default(false)
   soldOut          Boolean             @default(false)
   hidden           Boolean             @default(false)
   sortOrder        Int                 @default(0)

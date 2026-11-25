@@ -209,6 +209,24 @@ class MenuViewModel @Inject constructor(
         }
     }
 
+    fun adjustSimpleQty(productId: String, delta: Int) {
+        viewModelScope.launch {
+            cart.update { lines ->
+                lines.mapNotNull { line ->
+                    if (line.productId != productId || line.choiceIds.isNotEmpty() || !line.note.isNullOrBlank()) {
+                        line
+                    } else {
+                        val next = line.quantity + delta
+                        when {
+                            next <= 0 -> null
+                            else -> line.copy(quantity = next.coerceAtMost(20))
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     fun product(id: String): ProductDto? =
         _state.value.menu?.categories?.flatMap { it.products }?.find { it.id == id }
 }
@@ -473,33 +491,71 @@ fun MenuScreen(
                 }
             }
             Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(horizontal = 20.dp)) {
-                val featured = menu.featured
-                if (featured != null && state.categoryId == null) {
-                    Spacer(Modifier.height(16.dp))
-                    FeaturedCard(featured, onClick = { onProduct(featured.id) })
-                }
-                Spacer(Modifier.height(18.dp))
                 val allProducts = menu.categories.flatMap { it.products }
-                val products = if (state.categoryId == null) {
-                    allProducts.take(5)
+                if (state.categoryId == null) {
+                    val featured = menu.featured
+                    if (featured != null) {
+                        Spacer(Modifier.height(16.dp))
+                        FeaturedCard(featured, onClick = { onProduct(featured.id) })
+                    }
+                    val combos = allProducts.filter { it.combo }
+                    if (combos.isNotEmpty()) {
+                        Spacer(Modifier.height(18.dp))
+                        Text(stringResource(R.string.combos), style = MaterialTheme.typography.titleMedium)
+                        Spacer(Modifier.height(10.dp))
+                        Row(
+                            Modifier.horizontalScroll(rememberScrollState()),
+                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        ) {
+                            combos.forEach { product ->
+                                ComboCard(product, onClick = { onProduct(product.id) })
+                            }
+                        }
+                    }
+                    val bestsellers = allProducts
+                        .filter { !it.combo && it.id != featured?.id }
+                        .take(8)
+                    if (bestsellers.isNotEmpty()) {
+                        Spacer(Modifier.height(18.dp))
+                        Text(stringResource(R.string.bestsellers), style = MaterialTheme.typography.titleMedium)
+                        Spacer(Modifier.height(10.dp))
+                        Row(
+                            Modifier.horizontalScroll(rememberScrollState()),
+                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        ) {
+                            bestsellers.forEach { product ->
+                                BestsellerCard(product, onClick = { onProduct(product.id) })
+                            }
+                        }
+                    }
                 } else {
-                    menu.categories.filter { it.id == state.categoryId }.flatMap { it.products }
-                }
-                Text(
-                    if (state.categoryId == null) {
-                        stringResource(R.string.bestsellers)
-                    } else {
+                    Spacer(Modifier.height(18.dp))
+                    val products = menu.categories.filter { it.id == state.categoryId }.flatMap { it.products }
+                    Text(
                         menu.categories.find { it.id == state.categoryId }?.name
-                            ?: stringResource(R.string.category_items)
-                    },
-                    style = MaterialTheme.typography.titleMedium,
-                )
-                Spacer(Modifier.height(12.dp))
-                products.forEachIndexed { index, product ->
-                    ProductRow(product, index, onOpen = { onProduct(product.id) }, onAdd = {
-                        if (product.optionGroups.isEmpty()) vm.addSimple(product) else onProduct(product.id)
-                    })
+                            ?: stringResource(R.string.category_items),
+                        style = MaterialTheme.typography.titleMedium,
+                    )
                     Spacer(Modifier.height(12.dp))
+                    products.forEachIndexed { index, product ->
+                        val inCartQty = cart
+                            .filter { it.productId == product.id && it.choiceIds.isEmpty() && it.note.isNullOrBlank() }
+                            .sumOf { it.quantity }
+                        ProductRow(
+                            product = product,
+                            index = index,
+                            cartQty = inCartQty,
+                            onOpen = { onProduct(product.id) },
+                            onAdd = {
+                                if (product.optionGroups.isEmpty()) vm.addSimple(product) else onProduct(product.id)
+                            },
+                            onMinus = { vm.adjustSimpleQty(product.id, -1) },
+                            onPlus = {
+                                if (product.optionGroups.isEmpty()) vm.addSimple(product) else onProduct(product.id)
+                            },
+                        )
+                        Spacer(Modifier.height(12.dp))
+                    }
                 }
                 Spacer(Modifier.height(if (cart.isEmpty()) 12.dp else 88.dp))
             }
@@ -592,7 +648,80 @@ private fun FeaturedCard(product: ProductDto, onClick: () -> Unit) {
 }
 
 @Composable
-private fun ProductRow(product: ProductDto, index: Int, onOpen: () -> Unit, onAdd: () -> Unit) {
+private fun ComboCard(product: ProductDto, onClick: () -> Unit) {
+    Column(
+        Modifier
+            .width(220.dp)
+            .shadow(8.dp, RoundedCornerShape(22.dp), ambientColor = PrimaryGreen.copy(alpha = 0.08f), spotColor = PrimaryGreen.copy(alpha = 0.1f))
+            .clip(RoundedCornerShape(22.dp))
+            .background(Color.White)
+            .border(1.dp, Border, RoundedCornerShape(22.dp))
+            .clickable(onClick = onClick)
+            .padding(14.dp),
+    ) {
+        Text(
+            stringResource(R.string.combos),
+            color = PrimaryGreen,
+            modifier = Modifier
+                .background(PrimaryTint, RoundedCornerShape(12.dp))
+                .padding(horizontal = 10.dp, vertical = 5.dp),
+            style = MaterialTheme.typography.labelMedium,
+        )
+        Spacer(Modifier.height(10.dp))
+        ProductArt(product.imageUrl, PrimaryTint, Modifier.fillMaxWidth().height(110.dp), contentScale = ContentScale.Crop)
+        Spacer(Modifier.height(10.dp))
+        Text(product.name, color = PrimaryGreen, style = MaterialTheme.typography.titleMedium, maxLines = 2)
+        if (product.description.isNotBlank()) {
+            Spacer(Modifier.height(4.dp))
+            Text(product.description, color = PrimaryGreen.copy(alpha = 0.72f), style = MaterialTheme.typography.bodySmall, maxLines = 2)
+        }
+        Spacer(Modifier.height(8.dp))
+        Text(formatPrice(product.price), color = PrimaryGreen, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold)
+    }
+}
+
+@Composable
+private fun BestsellerCard(product: ProductDto, onClick: () -> Unit) {
+    Column(
+        Modifier
+            .width(220.dp)
+            .shadow(10.dp, RoundedCornerShape(22.dp), ambientColor = PrimaryGreen.copy(alpha = 0.18f), spotColor = PrimaryGreen.copy(alpha = 0.22f))
+            .clip(RoundedCornerShape(22.dp))
+            .background(Brush.verticalGradient(listOf(Color(0xFF163A2C), PrimaryGreen)))
+            .clickable(onClick = onClick)
+            .padding(14.dp),
+    ) {
+        Text(
+            stringResource(R.string.bestsellers),
+            color = Ink,
+            modifier = Modifier
+                .background(Accent, RoundedCornerShape(12.dp))
+                .padding(horizontal = 10.dp, vertical = 5.dp),
+            style = MaterialTheme.typography.labelMedium,
+        )
+        Spacer(Modifier.height(10.dp))
+        ProductArt(product.imageUrl, PrimaryTint, Modifier.fillMaxWidth().height(110.dp), contentScale = ContentScale.Crop)
+        Spacer(Modifier.height(10.dp))
+        Text(product.name, color = Color.White, style = MaterialTheme.typography.titleMedium, maxLines = 2)
+        if (product.description.isNotBlank()) {
+            Spacer(Modifier.height(4.dp))
+            Text(product.description, color = Color.White.copy(alpha = 0.8f), style = MaterialTheme.typography.bodySmall, maxLines = 2)
+        }
+        Spacer(Modifier.height(8.dp))
+        Text(formatPrice(product.price), color = Accent, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold)
+    }
+}
+
+@Composable
+private fun ProductRow(
+    product: ProductDto,
+    index: Int,
+    cartQty: Int = 0,
+    onOpen: () -> Unit,
+    onAdd: () -> Unit,
+    onMinus: () -> Unit = {},
+    onPlus: () -> Unit = onAdd,
+) {
     val tint = listOf(PrimaryTint, Sand, Lilac)[index % 3]
     val blocked = product.isUnavailable()
     val outsideHours = product.isOutsideHoursBlocked()
@@ -630,15 +759,51 @@ private fun ProductRow(product: ProductDto, index: Int, onOpen: () -> Unit, onAd
                 fontWeight = FontWeight.Bold,
             )
         }
-        IconButton(
-            onClick = onAdd,
-            enabled = !blocked,
-            modifier = Modifier
-                .size(44.dp)
-                .clip(RoundedCornerShape(RadiusMd))
-                .background(if (blocked) Border else PrimaryGreen),
-        ) {
-            Icon(Icons.Outlined.Add, stringResource(R.string.add), tint = Color.White)
+        if (cartQty > 0 && product.optionGroups.isEmpty() && !blocked) {
+            Row(
+                Modifier
+                    .height(44.dp)
+                    .clip(RoundedCornerShape(RadiusMd))
+                    .background(PrimaryTint)
+                    .border(1.dp, PrimaryGreen.copy(alpha = 0.35f), RoundedCornerShape(RadiusMd)),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    "−",
+                    modifier = Modifier
+                        .size(40.dp)
+                        .clickable(onClick = onMinus)
+                        .padding(horizontal = 12.dp, vertical = 10.dp),
+                    color = PrimaryGreen,
+                    style = MaterialTheme.typography.titleMedium,
+                )
+                Text(
+                    toPersianDigits(cartQty),
+                    color = PrimaryGreen,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                )
+                Text(
+                    "+",
+                    modifier = Modifier
+                        .size(40.dp)
+                        .clickable(onClick = onPlus)
+                        .padding(horizontal = 12.dp, vertical = 10.dp),
+                    color = PrimaryGreen,
+                    style = MaterialTheme.typography.titleMedium,
+                )
+            }
+        } else {
+            IconButton(
+                onClick = onAdd,
+                enabled = !blocked,
+                modifier = Modifier
+                    .size(44.dp)
+                    .clip(RoundedCornerShape(RadiusMd))
+                    .background(if (blocked) Border else PrimaryGreen),
+            ) {
+                Icon(Icons.Outlined.Add, stringResource(R.string.add), tint = Color.White)
+            }
         }
     }
 }

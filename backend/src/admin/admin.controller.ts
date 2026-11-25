@@ -168,9 +168,10 @@ export class AdminController {
   )
   upload(@Req() req: Request, @UploadedFile() file?: Express.Multer.File) {
     if (!file) throw new ApiException(HttpStatus.BAD_REQUEST, 'FILE_REQUIRED', 'فایل انتخاب نشده است');
+    // Always store/return a relative path so phones never keep a localhost/internal host.
     const relative = `/uploads/${file.filename}`;
-    const url = absolutizeMediaUrl(relative, publicBaseUrl(req)) ?? relative;
-    return { url };
+    void req;
+    return { url: relative, absoluteUrl: absolutizeMediaUrl(relative, publicBaseUrl(req)) ?? relative };
   }
 
   @Get('reports/summary')
