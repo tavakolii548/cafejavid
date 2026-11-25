@@ -1,6 +1,9 @@
 import type { Category, Order, Product, Settings } from './api';
 
-export const PREVIEW_MODE = true;
+/** Mock/offline admin. Production builds are always live; local `vite` defaults to preview. */
+export const PREVIEW_MODE = import.meta.env.PROD
+  ? false
+  : import.meta.env.VITE_PREVIEW_MODE !== 'false';
 
 export const previewSession = {
   accessToken: 'preview-token',
